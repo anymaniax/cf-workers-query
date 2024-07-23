@@ -29,5 +29,12 @@
         "targetName": "lint"
       }
     }
-  ]
+  ],
+  "release": {
+    "changelog": {
+      "workspaceChangelog": {
+        "createRelease": "github"
+      }
+    }
+  }
 }
