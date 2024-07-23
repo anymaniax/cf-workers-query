@@ -16,6 +16,7 @@ type CreateQuery<Data = unknown, Error = unknown> = {
   retryDelay?: RetryDelay<Error>;
   waitUntil?: (promise: Promise<any>) => void;
   cacheName?: string;
+  throwOnError?: boolean;
 };
 
 export const createQuery = async <Data = unknown, Error = unknown>({
@@ -28,6 +29,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   retryDelay,
   waitUntil,
   cacheName,
+  throwOnError,
 }: CreateQuery<Data, Error>): Promise<{
   data: Data | null;
   error: Error | null;
@@ -83,6 +85,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       queryFn,
       retry,
       retryDelay,
+      throwOnError,
     });
 
     if (error || !data) {
@@ -93,6 +96,10 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 
     return { data, error: null, invalidate };
   } catch (e) {
+    if (throwOnError) {
+      throw e;
+    }
+
     return { data: null, error: e as Error, invalidate: () => undefined };
   }
 };
@@ -120,11 +127,13 @@ const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
   retry = 0,
   failureCount = 0,
   retryDelay,
+  throwOnError,
 }: {
   queryFn: () => Promise<Data>;
   retry?: number | ((failureCount: number, error: Error) => boolean);
   failureCount?: number;
   retryDelay?: RetryDelay<Error>;
+  throwOnError?: boolean;
 }): Promise<{ data: Data | null; error: Error | null }> => {
   try {
     const data = await queryFn();
@@ -147,6 +156,10 @@ const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
         failureCount: failureCount + 1,
         retryDelay,
       });
+    }
+
+    if (throwOnError) {
+      throw e;
     }
 
     return { data: null, error: e as Error };
