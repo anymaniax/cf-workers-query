@@ -1,3 +1,14 @@
+## 0.2.1 (2024-07-23)
+
+
+### 🩹 Fixes
+
+- **context:** always provide executionCtx ([c2babfc](https://github.com/anymaniax/cf-workers-query/commit/c2babfc))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.2.0 (2024-07-23)
 
 
