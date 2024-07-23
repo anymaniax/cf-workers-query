@@ -33,7 +33,7 @@ export default {
       },
       staleTime: 30 * 1000,
       gcTime: 60 * 1000,
-      waitUntil: ctx.waitUntil,
+      executionCtx: ctx,
     });
     
     return new Response(JSON.stringify(data), {
@@ -45,7 +45,7 @@ export default {
 };
 ```
 
-To have revalidation automatically when the stale time is reached, you need to provide a `waitUntil` function to the `createQuery` function.
+To have revalidation automatically when the stale time is reached, you need to provide the `executionCtx` to the `createQuery` function.
 
 
 You can also use the `defineCFExecutionContext` function to define a custom execution context for the query. Can be useful if you are using a something like [hono](https://github.com/honojs/hono) or [remix](https://remix.run/).
@@ -90,10 +90,10 @@ Type: RetryDelay<Error>
 
 Description: Optional. Specifies the delay between retry attempts. This can be a number indicating milliseconds or a function returning the delay based on the failure count and error.
 
-### waitUntil
-Type: (promise: Promise<any>) => void
+### executionCtx
+Type: ExecutionContext
 
-Description: Optional. A function that can be used to wait until a given promise resolves before continuing. Used for refetching if stale data is detected.
+Description: Optional. The execution context to use.
 
 ### cacheName
 Type: string

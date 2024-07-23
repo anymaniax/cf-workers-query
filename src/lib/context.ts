@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { PlatformProxy } from 'wrangler';
 
-type ExecutionContext = PlatformProxy['ctx'];
+export type ExecutionContext = PlatformProxy['ctx'];
 
 const AsyncLocaleStorageContext = new AsyncLocalStorage<ExecutionContext>();
 

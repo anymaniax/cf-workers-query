@@ -1,4 +1,4 @@
-import { getCFExecutionContext } from './context';
+import { ExecutionContext, getCFExecutionContext } from './context';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
 import { nanoid } from 'nanoid';
 
@@ -14,7 +14,7 @@ type CreateQuery<Data = unknown, Error = unknown> = {
   revalidate?: boolean;
   retry?: number | ((failureCount: number, error: Error) => boolean);
   retryDelay?: RetryDelay<Error>;
-  waitUntil?: (promise: Promise<any>) => void;
+  executionCtx?: ExecutionContext;
   cacheName?: string;
   throwOnError?: boolean;
 };
@@ -27,7 +27,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   revalidate,
   retry,
   retryDelay,
-  waitUntil,
+  executionCtx,
   cacheName,
   throwOnError,
 }: CreateQuery<Data, Error>): Promise<{
@@ -46,8 +46,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     const cacheKey = queryKey;
     const invalidate = () => cache.delete(cacheKey);
 
-    const context = getCFExecutionContext();
-    const currentWaitUntil = waitUntil ?? context?.waitUntil;
+    const context = executionCtx ?? getCFExecutionContext();
 
     if (!revalidate) {
       const cachedData = await cache.retrieve<Data>(cacheKey);
@@ -56,7 +55,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
         const isStale =
           staleTime && cachedData.lastModified + staleTime * 1000 < Date.now();
 
-        if (isStale && currentWaitUntil) {
+        if (isStale && context) {
           const staleId = nanoid();
           await cache.update([...cacheKey, 'dedupe'], staleId);
 
@@ -72,10 +71,10 @@ export const createQuery = async <Data = unknown, Error = unknown>({
             await cache.update(cacheKey, newData);
           };
 
-          currentWaitUntil(refreshFunc());
+          context.waitUntil(refreshFunc());
         }
 
-        if (!isStale || (isStale && currentWaitUntil)) {
+        if (!isStale || (isStale && context)) {
           return { data: cachedData.data, error: null, invalidate };
         }
       }
