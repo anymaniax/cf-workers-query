@@ -2,6 +2,7 @@
   "name": "cf-workers-query",
   "version": "0.0.1",
   "license": "MIT",
+  "description": "Automatically cache and revalidate data in Cloudflare Workers. Using the Cache API and Execution Context",
   "author": {
     "name": "Victor Bury",
     "email": "victor@anymaniax.com"
