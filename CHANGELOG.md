@@ -1,3 +1,14 @@
+## 0.3.4 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **hono:** import create-query ([791a622](https://github.com/anymaniax/cf-workers-query/commit/791a622))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.3 (2024-07-25)
 
 
