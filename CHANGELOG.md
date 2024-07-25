@@ -1,3 +1,14 @@
+## 0.3.9 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **cache-api:** correctly handling key url ([8cbc15a](https://github.com/anymaniax/cf-workers-query/commit/8cbc15a))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.8 (2024-07-25)
 
 
