@@ -2,11 +2,11 @@ import { ExecutionContext, getCFExecutionContext } from './context';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
 import { nanoid } from 'nanoid';
 
-type RetryDelay<Error = unknown> =
+export type RetryDelay<Error = unknown> =
   | number
   | ((failureCount: number, error: Error) => number);
 
-type CreateQuery<Data = unknown, Error = unknown> = {
+export type CreateQuery<Data = unknown, Error = unknown> = {
   queryKey?: QueryKey | null;
   queryFn: () => Promise<Data>;
   staleTime?: number;

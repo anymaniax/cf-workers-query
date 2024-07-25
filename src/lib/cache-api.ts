@@ -1,5 +1,7 @@
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
+const CACHE_LAST_MODIFIED_HEADER = 'cf-workers-query-cache-last-modified';
+
 type CachePayload<Data = unknown> = {
   data: Data;
   lastModified: number;
@@ -22,31 +24,59 @@ export class CacheApiAdaptor {
   ): Promise<CachePayload<Data> | null> {
     const cache = await caches.open(this.cacheName);
 
-    const response = await cache.match(this.buildCacheKey(key));
-    return response ? response.json() : null;
+    const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
+
+    const response = await cache.match(cacheKey);
+
+    if (!response) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    const lastModifiedHeader = response.headers.get(CACHE_LAST_MODIFIED_HEADER);
+    const cacheControlHeader = response.headers.get('cache-control');
+
+    const lastModified = Number(lastModifiedHeader);
+    const cacheControl = cacheControlHeader?.split('=')[1];
+    const maxAge = Number(cacheControl);
+
+    return {
+      data,
+      lastModified: !isNaN(lastModified) ? lastModified : 0,
+      maxAge: !isNaN(maxAge) ? maxAge : 0,
+    };
   }
 
   public async update<Data = unknown>(
     key: QueryKey,
-    value: Data,
+    value: Data | Response,
     options?: { maxAge?: number }
   ) {
     const cache = await caches.open(this.cacheName);
 
     const maxAge = options?.maxAge ?? this.maxAge;
 
-    const payload: CachePayload = {
-      data: value,
-      lastModified: Date.now(),
-      maxAge,
-    };
+    const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
 
-    const response = new Response(JSON.stringify(payload), {
-      headers: new Headers({
-        'cache-control': `max-age=${maxAge}`,
-      }),
+    if (value instanceof Response) {
+      value.headers.set('cache-control', `max-age=${maxAge}`);
+      value.headers.set(CACHE_LAST_MODIFIED_HEADER, Date.now().toString());
+
+      await cache.put(cacheKey, value);
+      return;
+    }
+
+    const headers = new Headers();
+
+    headers.set('cache-control', `max-age=${maxAge}`);
+    headers.set(CACHE_LAST_MODIFIED_HEADER, Date.now().toString());
+
+    const response = new Response(JSON.stringify(value), {
+      headers,
     });
-    await cache.put(this.buildCacheKey(key), response);
+
+    await cache.put(cacheKey, response);
   }
 
   public async delete(key: QueryKey) {
@@ -58,7 +88,9 @@ export class CacheApiAdaptor {
       }),
     });
 
-    await cache.put(this.buildCacheKey(key), response);
+    const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
+
+    await cache.put(cacheKey, response);
   }
 
   /**
