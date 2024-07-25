@@ -55,22 +55,19 @@
   "nx": {
     "includedScripts": []
   },
-  "files": [
-    "dist"
-  ],
   "type": "commonjs",
-  "main": "./dist/src/index.js",
-  "typings": "./dist/src/index.d.ts",
+  "main": "./src/index.js",
+  "typings": "./src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "require": "./dist/src/index.js",
-      "import": "./dist/src/index.js"
+      "types": "./src/index.d.ts",
+      "require": "./src/index.js",
+      "import": "./src/index.js"
     },
     "./hono": {
-      "types": "./dist/src/hono.d.ts",
-      "require": "./dist/src/hono.js",
-      "import": "./dist/src/hono.js"
+      "types": "./src/lib/hono.d.ts",
+      "require": "./src/lib/hono.js",
+      "import": "./src/lib/hono.js"
     }
   }
 }
