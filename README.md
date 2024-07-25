@@ -63,10 +63,10 @@ import { cache } from 'cf-workers-query/hono';
 
 app.get('/user/:id', cache({
   handler: async (ctx, next) => {
-    const user = await fetchUser(ctx.params.id);
+    const user = await fetchUser(ctx.req.param('id'));
     return ctx.json(user)
   },
-  cacheKey: (ctx) => ['user', ctx.params.id], 
+  cacheKey: (ctx) => ['user', ctx.req.param('id')], 
   cacheTime: 60 * 60,
   staleTime: 60
 }));
