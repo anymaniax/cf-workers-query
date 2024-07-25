@@ -1,3 +1,14 @@
+## 0.3.7 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **hono:** correctly cache handler ([5c62051](https://github.com/anymaniax/cf-workers-query/commit/5c62051))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.6 (2024-07-25)
 
 
