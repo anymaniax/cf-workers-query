@@ -72,7 +72,7 @@
   },
   "typeVersions": {
     "hone": [
-      "./src/lib/hone.d.ts"
+      "./src/lib/hono.d.ts"
     ]
   }
 }
