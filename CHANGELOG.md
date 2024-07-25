@@ -1,3 +1,14 @@
+## 0.3.1 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **build:** output folder ([c6e11e8](https://github.com/anymaniax/cf-workers-query/commit/c6e11e8))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.0 (2024-07-25)
 
 
