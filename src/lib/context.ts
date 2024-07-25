@@ -1,7 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { PlatformProxy } from 'wrangler';
 
-export type ExecutionContext = PlatformProxy['ctx'];
+export type ExecutionContext = {
+  waitUntil(promise: Promise<any>): void;
+  passThroughOnException(): void;
+};
 
 const AsyncLocaleStorageContext = new AsyncLocalStorage<ExecutionContext>();
 
