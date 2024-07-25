@@ -1,3 +1,14 @@
+## 0.3.8 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **package:** remove wrangler ([e3e910c](https://github.com/anymaniax/cf-workers-query/commit/e3e910c))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.7 (2024-07-25)
 
 
