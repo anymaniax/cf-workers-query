@@ -70,9 +70,11 @@
       "import": "./src/lib/hono.js"
     }
   },
-  "typeVersions": {
-    "hono": [
-      "./src/lib/hono.d.ts"
-    ]
+  "typesVersions": {
+    "*": {
+      "hono": [
+        "./src/lib/hono.d.ts"
+      ]
+    }
   }
 }
