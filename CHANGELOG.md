@@ -1,3 +1,14 @@
+## 0.3.10 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **package:** type versions correctly formatted ([2add804](https://github.com/anymaniax/cf-workers-query/commit/2add804))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.9 (2024-07-25)
 
 
