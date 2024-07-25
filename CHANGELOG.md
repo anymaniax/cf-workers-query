@@ -1,3 +1,14 @@
+## 0.3.0 (2024-07-25)
+
+
+### 🚀 Features
+
+- **hono:** add cache middleware ([f11b47b](https://github.com/anymaniax/cf-workers-query/commit/f11b47b))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.2.1 (2024-07-23)
 
 
