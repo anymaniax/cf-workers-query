@@ -1,3 +1,14 @@
+## 0.3.3 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **build:** path exports ([120045f](https://github.com/anymaniax/cf-workers-query/commit/120045f))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.2 (2024-07-25)
 
 
