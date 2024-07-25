@@ -21,7 +21,8 @@ export const cache =
       queryFn: async () => {
         await next();
 
-        return ctx.res;
+        const clonedResponse = ctx.res.clone();
+        return clonedResponse;
       },
       executionCtx: ctx.executionCtx,
       throwOnError: true,
