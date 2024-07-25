@@ -6,9 +6,13 @@ export type RetryDelay<Error = unknown> =
   | number
   | ((failureCount: number, error: Error) => number);
 
+export type QueryFnOptions = {
+  isStale: boolean;
+};
+
 export type CreateQuery<Data = unknown, Error = unknown> = {
   queryKey?: QueryKey | null;
-  queryFn: () => Promise<Data>;
+  queryFn: (options: QueryFnOptions) => Promise<Data>;
   staleTime?: number;
   gcTime?: number;
   revalidate?: boolean;
@@ -39,7 +43,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 }> => {
   try {
     if (!queryKey) {
-      const data = await queryFn();
+      const data = await queryFn({ isStale: false });
       return { data, error: null, invalidate: () => undefined };
     }
 
@@ -79,7 +83,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
               return;
             }
 
-            const newData = await queryFn();
+            const newData = await queryFn({ isStale: true });
             await cache.update(cacheKey, newData);
           };
 
@@ -93,7 +97,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     }
 
     const { data, error } = await handleQueryFnWithRetry<Data, Error>({
-      queryFn,
+      retryFn: () => queryFn({ isStale: false }),
       retry,
       retryDelay,
       throwOnError,
@@ -134,26 +138,26 @@ function handleRetryDelay<Error = unknown>(
 }
 
 const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
-  queryFn,
+  retryFn,
   retry = 0,
   failureCount = 0,
   retryDelay,
   throwOnError,
 }: {
-  queryFn: () => Promise<Data>;
+  retryFn: () => Promise<Data>;
   retry?: number | ((failureCount: number, error: Error) => boolean);
   failureCount?: number;
   retryDelay?: RetryDelay<Error>;
   throwOnError?: boolean;
 }): Promise<{ data: Data | null; error: Error | null }> => {
   try {
-    const data = await queryFn();
+    const data = await retryFn();
     return { data, error: null };
   } catch (e) {
     if (typeof retry === 'number' && retry > 0) {
       await handleRetryDelay(failureCount, e as Error, retryDelay);
       return handleQueryFnWithRetry({
-        queryFn,
+        retryFn,
         retry: retry - 1,
         retryDelay,
       });
@@ -162,7 +166,7 @@ const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
     if (typeof retry === 'function' && retry(failureCount + 1, e as Error)) {
       await handleRetryDelay(failureCount, e as Error, retryDelay);
       return handleQueryFnWithRetry({
-        queryFn,
+        retryFn,
         retry,
         failureCount: failureCount + 1,
         retryDelay,

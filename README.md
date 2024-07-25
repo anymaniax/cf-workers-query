@@ -52,10 +52,32 @@ You can also use the `defineCFExecutionContext` function to define a custom exec
 
 Example using `defineCFExecutionContext`:
 
-
-### Hono example
+## Hono
 
 In this case you don't need to use `defineCFExecutionContext` as the execution context is provided automatically.
+
+### example with middleware
+
+```ts
+import { cache } from 'cf-workers-query/hono';
+
+
+app.get('/user/:id',
+  cache({
+    cacheKey: (ctx) => ['user', c.req.param('id')],
+    cacheTime: 60 * 60,
+    staleTime: 60
+  }),
+  async (ctx) => {
+    const user = await fetchUser(c.req.param('id'));
+    return ctx.json(user);
+  });
+
+```
+
+
+###  example with handler
+
 
 ```ts
 import { cache } from 'cf-workers-query/hono';
@@ -63,10 +85,10 @@ import { cache } from 'cf-workers-query/hono';
 
 app.get('/user/:id', cache({
   handler: async (ctx, next) => {
-    const user = await fetchUser(ctx.params.id);
+    const user = await fetchUser(c.req.param('id'));
     return ctx.json(user)
   },
-  cacheKey: (ctx) => ['user', ctx.params.id], 
+  cacheKey: (ctx) => ['user', c.req.param('id')], 
   cacheTime: 60 * 60,
   staleTime: 60
 }));
