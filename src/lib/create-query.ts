@@ -17,6 +17,7 @@ export type CreateQuery<Data = unknown, Error = unknown> = {
   executionCtx?: ExecutionContext;
   cacheName?: string;
   throwOnError?: boolean;
+  raw?: boolean;
 };
 
 export const createQuery = async <Data = unknown, Error = unknown>({
@@ -30,6 +31,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   executionCtx,
   cacheName,
   throwOnError,
+  raw,
 }: CreateQuery<Data, Error>): Promise<{
   data: Data | null;
   error: Error | null;
@@ -49,7 +51,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     const context = executionCtx ?? getCFExecutionContext();
 
     if (!revalidate) {
-      const cachedData = await cache.retrieve<Data>(cacheKey);
+      const cachedData = await cache.retrieve<Data>(cacheKey, { raw });
 
       if (cachedData?.data) {
         const isStale =

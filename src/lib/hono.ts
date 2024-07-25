@@ -1,7 +1,7 @@
-import { Context, MiddlewareHandler } from 'hono';
-import { createQuery } from './create-query';
+import { Context, Handler, MiddlewareHandler } from 'hono';
+import { createQuery, CreateQuery } from './create-query';
 import { QueryKey } from './cache-api';
-import { CreateQuery } from './create-query';
+import { HTTPException } from 'hono/http-exception';
 
 type CacheKey = QueryKey | ((ctx: Context) => QueryKey);
 
@@ -10,23 +10,24 @@ type CacheOptions = Omit<
   'queryKey' | 'queryFn' | 'executionCtx' | 'throwOnError'
 > & {
   cacheKey: CacheKey;
+  handler: Handler;
 };
 
 export const cache =
-  ({ cacheKey, ...options }: CacheOptions): MiddlewareHandler =>
+  ({ cacheKey, handler, ...options }: CacheOptions): MiddlewareHandler =>
   async (ctx, next) => {
-    const { data: response } = await createQuery({
+    const { data: response, error } = await createQuery<Response>({
       ...options,
       queryKey: typeof cacheKey === 'function' ? cacheKey(ctx) : cacheKey,
-      queryFn: async () => {
-        await next();
-
-        const clonedResponse = ctx.res.clone();
-        return clonedResponse;
-      },
+      queryFn: () => handler(ctx, next),
       executionCtx: ctx.executionCtx,
       throwOnError: true,
+      raw: true,
     });
 
-    return response;
+    if (!response || error) {
+      throw new HTTPException(500);
+    }
+
+    return new Response(response.body, response);
   };
