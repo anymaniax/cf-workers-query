@@ -59,11 +59,21 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 
         if (isStale && context) {
           const staleId = nanoid();
-          await cache.update([...cacheKey, 'dedupe'], staleId);
+
+          const dedupeKey =
+            cacheKey instanceof URL
+              ? new URL(cacheKey)
+              : [...cacheKey, 'dedupe'];
+
+          if (dedupeKey instanceof URL) {
+            dedupeKey.searchParams.set('dedupe', staleId);
+          }
+
+          await cache.update(dedupeKey, staleId);
 
           const refreshFunc = async () => {
             const { data: cachedStaleId } =
-              (await cache.retrieve<string>([...cacheKey, 'dedupe'])) ?? {};
+              (await cache.retrieve<string>(dedupeKey)) ?? {};
 
             if (cachedStaleId && cachedStaleId !== staleId) {
               return;

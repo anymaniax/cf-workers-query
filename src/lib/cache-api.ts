@@ -6,7 +6,7 @@ type CachePayload<Data = unknown> = {
   maxAge: number;
 };
 
-export type QueryKey = Array<string | boolean | number>;
+export type QueryKey = Array<string | boolean | number> | URL;
 
 export class CacheApiAdaptor {
   private cacheName: string;
@@ -103,7 +103,7 @@ export class CacheApiAdaptor {
    * @param key Key for the item in the suspense cache.
    * @returns The fully-formed cache key for the suspense cache.
    */
-  public buildCacheKey(key: QueryKey) {
+  public buildCacheKey(key: Array<string | boolean | number>) {
     return `https://${CACHE_URL}/entry/${key.join('/')}`;
   }
 }

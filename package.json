@@ -69,5 +69,10 @@
       "require": "./src/lib/hono.js",
       "import": "./src/lib/hono.js"
     }
+  },
+  "typeVersions": {
+    "hone": [
+      "./src/lib/hone.d.ts"
+    ]
   }
 }
