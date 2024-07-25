@@ -1,3 +1,14 @@
+## 0.4.0 (2024-07-25)
+
+
+### 🚀 Features
+
+- **hono:** cache also handling as middleware ([31ee22c](https://github.com/anymaniax/cf-workers-query/commit/31ee22c))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.10 (2024-07-25)
 
 
