@@ -1,3 +1,14 @@
+## 0.3.6 (2024-07-25)
+
+
+### 🩹 Fixes
+
+- **hono:** clone response ([cac189a](https://github.com/anymaniax/cf-workers-query/commit/cac189a))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.5 (2024-07-25)
 
 This was a version bump only, there were no code changes.
