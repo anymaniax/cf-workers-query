@@ -12,10 +12,7 @@
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "@cf-workers-query/source": ["src/index.ts"]
-    }
+    "baseUrl": "."
   },
   "files": [],
   "include": [],

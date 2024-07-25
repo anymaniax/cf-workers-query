@@ -1,5 +1,5 @@
 import { Context, MiddlewareHandler } from 'hono';
-import { createQuery } from '@cf-workers-query/source';
+import { createQuery } from './create-query';
 import { QueryKey } from './cache-api';
 import { CreateQuery } from './create-query';
 
