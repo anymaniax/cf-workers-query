@@ -1,3 +1,14 @@
+## 0.4.0 (2024-07-30)
+
+
+### 🚀 Features
+
+- **cache-api:** queryKey handle object ([f76fb8e](https://github.com/anymaniax/cf-workers-query/commit/f76fb8e))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.3.10 (2024-07-25)
 
 
