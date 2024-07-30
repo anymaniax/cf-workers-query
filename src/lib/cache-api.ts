@@ -6,7 +6,7 @@ type CachePayload<Data = unknown> = {
   maxAge: number;
 };
 
-export type QueryKey = Array<string | boolean | number> | URL;
+export type QueryKey = ReadonlyArray<unknown> | URL;
 
 export class CacheApiAdaptor {
   private cacheName: string;
@@ -103,7 +103,60 @@ export class CacheApiAdaptor {
    * @param key Key for the item in the suspense cache.
    * @returns The fully-formed cache key for the suspense cache.
    */
-  public buildCacheKey(key: Array<string | boolean | number>) {
-    return `https://${CACHE_URL}/entry/${key.join('/')}`;
+  public buildCacheKey(key: ReadonlyArray<unknown>) {
+    return `https://${CACHE_URL}/entry?key=${hashKey(key)}`;
   }
+}
+
+// Copied from: https://github.com/jonschlinkert/is-plain-object
+export function isPlainObject(o: any): o is Object {
+  if (!hasObjectPrototype(o)) {
+    return false;
+  }
+
+  // If has no constructor
+  const ctor = o.constructor;
+  if (ctor === undefined) {
+    return true;
+  }
+
+  // If has modified prototype
+  const prot = ctor.prototype;
+  if (!hasObjectPrototype(prot)) {
+    return false;
+  }
+
+  // If constructor does not have an Object-specific method
+  if (!prot.hasOwnProperty('isPrototypeOf')) {
+    return false;
+  }
+
+  // Handles Objects created by Object.create(<arbitrary prototype>)
+  if (Object.getPrototypeOf(o) !== Object.prototype) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+}
+
+function hasObjectPrototype(o: any): boolean {
+  return Object.prototype.toString.call(o) === '[object Object]';
+}
+
+/**
+ * Default query & mutation keys hash function.
+ * Hashes the value into a stable hash.
+ */
+export function hashKey(queryKey: ReadonlyArray<unknown>): string {
+  return JSON.stringify(queryKey, (_, val) =>
+    isPlainObject(val)
+      ? Object.keys(val)
+          .sort()
+          .reduce((result, key) => {
+            result[key] = val[key];
+            return result;
+          }, {} as any)
+      : val
+  );
 }
