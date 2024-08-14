@@ -66,7 +66,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
               : [...cacheKey, 'dedupe'];
 
           if (dedupeKey instanceof URL) {
-            dedupeKey.searchParams.set('dedupe', staleId);
+            dedupeKey.searchParams.set('dedupe', 'true');
           }
 
           await cache.update(dedupeKey, staleId);

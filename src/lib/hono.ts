@@ -7,14 +7,20 @@ type CacheKey = QueryKey | ((ctx: Context) => QueryKey);
 
 type CacheOptions = Omit<
   CreateQuery,
-  'queryKey' | 'queryFn' | 'executionCtx' | 'throwOnError'
+  'queryKey' | 'queryFn' | 'executionCtx' | 'throwOnError' | 'revalidate'
 > & {
   cacheKey: CacheKey;
   handler: Handler;
+  revalidate?: boolean | ((ctx: Context) => boolean);
 };
 
 export const cache =
-  ({ cacheKey, handler, ...options }: CacheOptions): MiddlewareHandler =>
+  ({
+    cacheKey,
+    handler,
+    revalidate,
+    ...options
+  }: CacheOptions): MiddlewareHandler =>
   async (ctx, next) => {
     const { data: response, error } = await createQuery<Response>({
       ...options,
@@ -23,6 +29,12 @@ export const cache =
       executionCtx: ctx.executionCtx,
       throwOnError: true,
       raw: true,
+      ...(revalidate
+        ? {
+            revalidate:
+              typeof revalidate === 'boolean' ? revalidate : revalidate(ctx),
+          }
+        : {}),
     });
 
     if (!response || error) {
