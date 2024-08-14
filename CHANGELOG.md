@@ -1,3 +1,14 @@
+## 0.5.0 (2024-08-14)
+
+
+### 🚀 Features
+
+- **hono:** add possibility to pass a function to revalidate ([0b41029](https://github.com/anymaniax/cf-workers-query/commit/0b41029))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.4.2 (2024-07-30)
 
 This was a version bump only, there were no code changes.
