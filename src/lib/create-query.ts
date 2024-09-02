@@ -93,8 +93,9 @@ export const createQuery = async <Data = unknown, Error = unknown>({
         }
 
         if (!isStale || (isStale && context)) {
-          console.log('cache hit with stale', isStale);
-          return { data: cachedData.data, error: null, invalidate };
+          if (typeof enabled !== 'function' || enabled(cachedData.data)) {
+            return { data: cachedData.data, error: null, invalidate };
+          }
         }
       }
     }
