@@ -1,3 +1,14 @@
+## 0.6.3 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** response headers immutability handling ([b399660](https://github.com/anymaniax/cf-workers-query/commit/b399660))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.2 (2024-09-02)
 
 
