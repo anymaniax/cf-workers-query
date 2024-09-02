@@ -1,6 +1,6 @@
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
-const HEADER_RAW = 'cf-workers-query-raw';
+const HEADER = 'cf-workers-query';
 
 type CachePayload<Data = unknown> = {
   data: Data;
@@ -19,7 +19,7 @@ const getVoidCache = () => {
     },
     match: async (key: URL | string): Promise<Response | undefined> => {
       return undefined;
-    }
+    },
   };
 };
 
@@ -31,7 +31,6 @@ const getCache = async (cacheName: string) => {
   return caches.open(cacheName);
 };
 
-
 export class CacheApiAdaptor {
   private cacheName: string;
   private maxAge: number;
@@ -42,7 +41,7 @@ export class CacheApiAdaptor {
   }
 
   public async retrieve<Data = unknown>(
-    key: QueryKey,
+    key: QueryKey
   ): Promise<CachePayload<Data> | null> {
     try {
       const cache = await getCache(this.cacheName);
@@ -55,13 +54,11 @@ export class CacheApiAdaptor {
         return null;
       }
 
-      const raw = response.headers.get(HEADER_RAW) === 'true';
+      const createdResponse = response.headers.get(HEADER) === 'true';
 
-      const data = (raw ? response : await response.json()) as Data;
-
-      if(raw) {
-        response.headers.delete(HEADER_RAW);
-      }
+      const data = (
+        !createdResponse ? response : await response.json()
+      ) as Data;
 
       const cacheControlHeader = response.headers.get('cache-control');
       const dateHeader = response.headers.get('date');
@@ -73,7 +70,7 @@ export class CacheApiAdaptor {
       return {
         data,
         lastModified,
-        maxAge: !isNaN(maxAge) ? maxAge : 0
+        maxAge: !isNaN(maxAge) ? maxAge : 0,
       };
     } catch {
       return null;
@@ -92,10 +89,9 @@ export class CacheApiAdaptor {
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
 
     if (value instanceof Response) {
-      const response = value.clone();
+      const response = value;
 
       response.headers.append('cache-control', `max-age=${maxAge}`);
-      response.headers.set(HEADER_RAW, 'true');
 
       await cache.put(cacheKey, response);
       return;
@@ -104,9 +100,10 @@ export class CacheApiAdaptor {
     const headers = new Headers();
 
     headers.append('cache-control', `max-age=${maxAge}`);
+    headers.append(HEADER, 'true');
 
     const response = new Response(JSON.stringify(value), {
-      headers
+      headers,
     });
 
     await cache.put(cacheKey, response);
@@ -117,8 +114,8 @@ export class CacheApiAdaptor {
 
     const response = new Response(null, {
       headers: new Headers({
-        'cache-control': `max-age=0`
-      })
+        'cache-control': `max-age=0`,
+      }),
     });
 
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
@@ -181,11 +178,11 @@ export function hashKey(queryKey: ReadonlyArray<unknown>): string {
   return JSON.stringify(queryKey, (_, val) =>
     isPlainObject(val)
       ? Object.keys(val)
-        .sort()
-        .reduce((result, key) => {
-          result[key] = val[key];
-          return result;
-        }, {} as any)
+          .sort()
+          .reduce((result, key) => {
+            result[key] = val[key];
+            return result;
+          }, {} as any)
       : val
   );
 }

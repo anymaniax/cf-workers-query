@@ -110,10 +110,12 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     }
 
     if (typeof enabled !== 'function' || enabled(data)) {
+      const cacheData = data instanceof Response ? data.clone() : data;
+
       if (context) {
-        context.waitUntil(cache.update<Data>(cacheKey, data));
+        context.waitUntil(cache.update<Data>(cacheKey, cacheData));
       } else {
-        await cache.update<Data>(cacheKey, data);
+        await cache.update<Data>(cacheKey, cacheData);
       }
     }
 
