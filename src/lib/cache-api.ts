@@ -1,6 +1,7 @@
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
 const HEADER = 'cf-workers-query';
+const HEADER_DATE = 'cf-workers-query-date';
 
 type CachePayload<Data = unknown> = {
   data: Data;
@@ -55,21 +56,26 @@ export class CacheApiAdaptor {
       }
 
       const createdResponse = response.headers.get(HEADER) === 'true';
+      const cacheControlHeader = response.headers.get('cache-control');
+      const dateHeader = response.headers.get(HEADER_DATE);
 
       const data = (
-        !createdResponse ? response : await response.json()
+        !createdResponse
+          ? new Response(response.body, response)
+          : await response.json()
       ) as Data;
 
-      const cacheControlHeader = response.headers.get('cache-control');
-      const dateHeader = response.headers.get('date');
+      if (!createdResponse) {
+        (data as Response).headers.delete(HEADER_DATE);
+      }
 
-      const lastModified = dateHeader ? new Date(dateHeader).getTime() : 0;
+      const lastModified = Number(dateHeader);
       const cacheControl = cacheControlHeader?.split('=')[1];
       const maxAge = Number(cacheControl);
 
       return {
         data,
-        lastModified,
+        lastModified: !isNaN(lastModified) ? lastModified : 0,
         maxAge: !isNaN(maxAge) ? maxAge : 0,
       };
     } catch {
@@ -92,6 +98,7 @@ export class CacheApiAdaptor {
       const response = new Response(value.body, value);
 
       response.headers.append('cache-control', `max-age=${maxAge}`);
+      response.headers.append(HEADER_DATE, Date.now().toString());
 
       await cache.put(cacheKey, response);
       return;
@@ -101,6 +108,7 @@ export class CacheApiAdaptor {
 
     headers.append('cache-control', `max-age=${maxAge}`);
     headers.append(HEADER, 'true');
+    headers.append(HEADER_DATE, Date.now().toString());
 
     const response = new Response(JSON.stringify(value), {
       headers,

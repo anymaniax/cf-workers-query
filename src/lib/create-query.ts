@@ -75,7 +75,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
             dedupeKey.searchParams.set('dedupe', 'true');
           }
 
-          await cache.update(dedupeKey, staleId);
+          await cache.update(dedupeKey, staleId, { maxAge: 60 });
 
           const refreshFunc = async () => {
             const { data: cachedStaleId } =
@@ -93,6 +93,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
         }
 
         if (!isStale || (isStale && context)) {
+          console.log('cache hit with stale', isStale);
           return { data: cachedData.data, error: null, invalidate };
         }
       }
