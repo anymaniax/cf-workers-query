@@ -1,5 +1,7 @@
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
+const HEADER_RAW = 'cf-workers-query-raw';
+
 type CachePayload<Data = unknown> = {
   data: Data;
   lastModified: number;
@@ -29,6 +31,7 @@ const getCache = async (cacheName: string) => {
   return caches.open(cacheName);
 };
 
+
 export class CacheApiAdaptor {
   private cacheName: string;
   private maxAge: number;
@@ -40,10 +43,8 @@ export class CacheApiAdaptor {
 
   public async retrieve<Data = unknown>(
     key: QueryKey,
-    options?: { raw?: boolean }
   ): Promise<CachePayload<Data> | null> {
     try {
-      const { raw = false } = options ?? {};
       const cache = await getCache(this.cacheName);
 
       const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
@@ -54,7 +55,13 @@ export class CacheApiAdaptor {
         return null;
       }
 
+      const raw = response.headers.get(HEADER_RAW) === 'true';
+
       const data = (raw ? response : await response.json()) as Data;
+
+      if(raw) {
+        response.headers.delete(HEADER_RAW);
+      }
 
       const cacheControlHeader = response.headers.get('cache-control');
       const dateHeader = response.headers.get('date');
@@ -88,6 +95,7 @@ export class CacheApiAdaptor {
       const response = value.clone();
 
       response.headers.append('cache-control', `max-age=${maxAge}`);
+      response.headers.set(HEADER_RAW, 'true');
 
       await cache.put(cacheKey, response);
       return;
