@@ -1,3 +1,14 @@
+## 0.5.4 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** use cache function everywhere ([42d5881](https://github.com/anymaniax/cf-workers-query/commit/42d5881))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.5.3 (2024-09-02)
 
 
