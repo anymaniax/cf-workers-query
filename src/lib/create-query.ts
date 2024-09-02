@@ -17,7 +17,7 @@ export type CreateQuery<Data = unknown, Error = unknown> = {
   executionCtx?: ExecutionContext;
   cacheName?: string;
   throwOnError?: boolean;
-  raw?: boolean;
+  enabled?: boolean | ((data: Data) => boolean);
 };
 
 export const createQuery = async <Data = unknown, Error = unknown>({
@@ -31,14 +31,14 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   executionCtx,
   cacheName,
   throwOnError,
-  raw,
+  enabled = true,
 }: CreateQuery<Data, Error>): Promise<{
   data: Data | null;
   error: Error | null;
   invalidate: () => Promise<void> | void;
 }> => {
   try {
-    if (!queryKey) {
+    if (!queryKey || !enabled) {
       const data = await queryFn();
       return { data, error: null, invalidate: () => undefined };
     }
@@ -48,10 +48,16 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     const cacheKey = queryKey;
     const invalidate = () => cache.delete(cacheKey);
 
-    const context = executionCtx ?? getCFExecutionContext();
+    const context = (executionCtx ?? getCFExecutionContext()) as
+      | ExecutionContext
+      | undefined;
 
-    if (!revalidate) {
-      const cachedData = await cache.retrieve<Data>(cacheKey, { raw });
+    if (context && !!staleTime) {
+      console.warn('Context not found, staleTime will be ignored');
+    }
+
+    if (!revalidate && staleTime !== 0) {
+      const cachedData = await cache.retrieve<Data>(cacheKey);
 
       if (cachedData?.data) {
         const isStale =
@@ -103,7 +109,13 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       return { data: null, error, invalidate: () => undefined };
     }
 
-    await cache.update<Data>(cacheKey, data);
+    if (typeof enabled !== 'function' || enabled(data)) {
+      if (context) {
+        context.waitUntil(cache.update<Data>(cacheKey, data));
+      } else {
+        await cache.update<Data>(cacheKey, data);
+      }
+    }
 
     return { data, error: null, invalidate };
   } catch (e) {

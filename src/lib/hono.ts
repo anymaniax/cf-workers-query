@@ -28,7 +28,6 @@ export const cache =
       queryFn: () => handler(ctx, next),
       executionCtx: ctx.executionCtx,
       throwOnError: true,
-      raw: true,
       ...(revalidate
         ? {
             revalidate:
