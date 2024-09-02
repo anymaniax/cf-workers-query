@@ -1,3 +1,14 @@
+## 0.6.5 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **create-query:** also check cached data with enabled ([30af66e](https://github.com/anymaniax/cf-workers-query/commit/30af66e))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.4 (2024-09-02)
 
 
