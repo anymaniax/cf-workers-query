@@ -52,7 +52,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       | ExecutionContext
       | undefined;
 
-    if (context && !!staleTime) {
+    if (!context && !!staleTime) {
       console.warn('Context not found, staleTime will be ignored');
     }
 
