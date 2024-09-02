@@ -1,3 +1,15 @@
+## 0.6.0 (2024-09-02)
+
+
+### 🚀 Features
+
+- **cache-api:** better handling receive a response in data ([332f306](https://github.com/anymaniax/cf-workers-query/commit/332f306))
+- **create-query:** add enabled option ([b15c891](https://github.com/anymaniax/cf-workers-query/commit/b15c891))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.5.4 (2024-09-02)
 
 
