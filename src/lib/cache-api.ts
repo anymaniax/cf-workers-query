@@ -8,6 +8,34 @@ type CachePayload<Data = unknown> = {
 
 export type QueryKey = ReadonlyArray<unknown> | URL;
 
+const getVoidCache = () => {
+  console.warn('No caches API available');
+
+  return {
+    open: async (cacheName: string) => {
+      return {
+        put: async (key: string, value: unknown) => {
+          return;
+        },
+        match: async (key: string) => {
+          return null;
+        },
+        delete: async (key: string) => {
+          return;
+        },
+      };
+    }
+  }
+}
+
+const getCache = async (cacheName: string) => {
+  if(!globalThis.caches){
+    return getVoidCache();
+  }
+
+  return caches.open(cacheName);
+}
+
 export class CacheApiAdaptor {
   private cacheName: string;
   private maxAge: number;
