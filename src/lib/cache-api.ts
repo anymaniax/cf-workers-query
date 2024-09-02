@@ -12,19 +12,12 @@ const getVoidCache = () => {
   console.warn('No caches API available');
 
   return {
-    open: async (cacheName: string) => {
-      return {
-        put: async (key: string, value: unknown) => {
-          return;
-        },
-        match: async (key: string) => {
-          return null;
-        },
-        delete: async (key: string) => {
-          return;
-        },
-      };
-    }
+    put: async (key: string, value: unknown) => {
+      return;
+    },
+    match: async (key: URL | string): Promise<Response | undefined> => {
+      return undefined;
+    },
   }
 }
 
@@ -51,7 +44,7 @@ export class CacheApiAdaptor {
   ): Promise<CachePayload<Data> | null> {
     try {
       const { raw = false } = options ?? {};
-      const cache = await caches.open(this.cacheName);
+      const cache = await getCache(this.cacheName);
 
       const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
 
