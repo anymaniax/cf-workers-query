@@ -12,22 +12,22 @@ const getVoidCache = () => {
   console.warn('No caches API available');
 
   return {
-    put: async (key: string, value: unknown) => {
+    put: async (key: URL | string, value: unknown) => {
       return;
     },
     match: async (key: URL | string): Promise<Response | undefined> => {
       return undefined;
-    },
-  }
-}
+    }
+  };
+};
 
 const getCache = async (cacheName: string) => {
-  if(!globalThis.caches){
+  if (!globalThis.caches) {
     return getVoidCache();
   }
 
   return caches.open(cacheName);
-}
+};
 
 export class CacheApiAdaptor {
   private cacheName: string;
@@ -66,7 +66,7 @@ export class CacheApiAdaptor {
       return {
         data,
         lastModified,
-        maxAge: !isNaN(maxAge) ? maxAge : 0,
+        maxAge: !isNaN(maxAge) ? maxAge : 0
       };
     } catch {
       return null;
@@ -78,7 +78,7 @@ export class CacheApiAdaptor {
     value: Data | Response,
     options?: { maxAge?: number }
   ) {
-    const cache = await caches.open(this.cacheName);
+    const cache = await getCache(this.cacheName);
 
     const maxAge = options?.maxAge ?? this.maxAge;
 
@@ -98,19 +98,19 @@ export class CacheApiAdaptor {
     headers.append('cache-control', `max-age=${maxAge}`);
 
     const response = new Response(JSON.stringify(value), {
-      headers,
+      headers
     });
 
     await cache.put(cacheKey, response);
   }
 
   public async delete(key: QueryKey) {
-    const cache = await caches.open(this.cacheName);
+    const cache = await getCache(this.cacheName);
 
     const response = new Response(null, {
       headers: new Headers({
-        'cache-control': `max-age=0`,
-      }),
+        'cache-control': `max-age=0`
+      })
     });
 
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
@@ -173,11 +173,11 @@ export function hashKey(queryKey: ReadonlyArray<unknown>): string {
   return JSON.stringify(queryKey, (_, val) =>
     isPlainObject(val)
       ? Object.keys(val)
-          .sort()
-          .reduce((result, key) => {
-            result[key] = val[key];
-            return result;
-          }, {} as any)
+        .sort()
+        .reduce((result, key) => {
+          result[key] = val[key];
+          return result;
+        }, {} as any)
       : val
   );
 }
