@@ -89,7 +89,7 @@ export class CacheApiAdaptor {
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
 
     if (value instanceof Response) {
-      const response = value;
+      const response = new Response(value.body, value);
 
       response.headers.append('cache-control', `max-age=${maxAge}`);
 
