@@ -1,3 +1,14 @@
+## 0.6.4 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** staletime check milliseconds ([de23f39](https://github.com/anymaniax/cf-workers-query/commit/de23f39))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.3 (2024-09-02)
 
 
