@@ -1,3 +1,14 @@
+## 0.6.2 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** better handling raw response ([041572b](https://github.com/anymaniax/cf-workers-query/commit/041572b))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.1 (2024-09-02)
 
 
