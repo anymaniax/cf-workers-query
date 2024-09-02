@@ -1,3 +1,14 @@
+## 0.5.3 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** properly handle no caches api ([f49d13b](https://github.com/anymaniax/cf-workers-query/commit/f49d13b))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.5.2 (2024-09-02)
 
 
