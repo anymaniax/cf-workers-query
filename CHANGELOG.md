@@ -1,3 +1,15 @@
+## 0.5.2 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **cache-api:** detect if cache API is available ([3b6fb22](https://github.com/anymaniax/cf-workers-query/commit/3b6fb22))
+- **tsconfig:** bundle ([2363c63](https://github.com/anymaniax/cf-workers-query/commit/2363c63))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.5.1 (2024-09-02)
 
 This was a version bump only, there were no code changes.
