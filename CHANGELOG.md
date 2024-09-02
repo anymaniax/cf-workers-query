@@ -1,3 +1,14 @@
+## 0.6.1 (2024-09-02)
+
+
+### 🩹 Fixes
+
+- **create-query:** correctly display warning context ([50a50dc](https://github.com/anymaniax/cf-workers-query/commit/50a50dc))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.0 (2024-09-02)
 
 
