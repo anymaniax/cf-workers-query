@@ -1,3 +1,18 @@
+## 0.7.0 (2024-09-09)
+
+
+### 🚀 Features
+
+- **create-query:** use handle query with retry anyway ([0f90324](https://github.com/anymaniax/cf-workers-query/commit/0f90324))
+
+### 🩹 Fixes
+
+- **cache-api:** handling current cache control ([a760e7c](https://github.com/anymaniax/cf-workers-query/commit/a760e7c))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.6.5 (2024-09-02)
 
 
