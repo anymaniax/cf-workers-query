@@ -38,9 +38,15 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   invalidate: () => Promise<void> | void;
 }> => {
   try {
-    if (!queryKey || !enabled) {
-      const data = await queryFn();
-      return { data, error: null, invalidate: () => undefined };
+    if (!queryKey || !enabled || !gcTime) {
+      const { data, error } = await handleQueryFnWithRetry<Data, Error>({
+        queryFn,
+        retry,
+        retryDelay,
+        throwOnError,
+      });
+
+      return { data, error, invalidate: () => undefined };
     }
 
     const cache = new CacheApiAdaptor({ maxAge: gcTime, cacheName });
