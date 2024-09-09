@@ -2,6 +2,7 @@ export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
 const HEADER = 'cf-workers-query';
 const HEADER_DATE = 'cf-workers-query-date';
+const HEADER_CURRENT_CACHE_CONTROL = 'cf-workers-query-current-cache-control';
 
 type CachePayload<Data = unknown> = {
   data: Data;
@@ -67,6 +68,15 @@ export class CacheApiAdaptor {
 
       if (!createdResponse) {
         (data as Response).headers.delete(HEADER_DATE);
+        (data as Response).headers.delete('cache-control');
+
+        const currentCacheControl = response.headers.get(
+          HEADER_CURRENT_CACHE_CONTROL
+        );
+        if (currentCacheControl) {
+          (data as Response).headers.set('cache-control', currentCacheControl);
+          (data as Response).headers.delete(HEADER_CURRENT_CACHE_CONTROL);
+        }
       }
 
       const lastModified = Number(dateHeader);
@@ -97,8 +107,16 @@ export class CacheApiAdaptor {
     if (value instanceof Response) {
       const response = new Response(value.body, value);
 
-      response.headers.append('cache-control', `max-age=${maxAge}`);
-      response.headers.append(HEADER_DATE, Date.now().toString());
+      const isAlreadyCached = response.headers.get('cf-cache-status') === 'HIT';
+
+      const currentCacheControl = value.headers.get('cache-control');
+
+      response.headers.set('cache-control', `max-age=${maxAge}`);
+      response.headers.set(HEADER_DATE, Date.now().toString());
+
+      if (!isAlreadyCached && currentCacheControl) {
+        response.headers.set(HEADER_CURRENT_CACHE_CONTROL, currentCacheControl);
+      }
 
       await cache.put(cacheKey, response);
       return;
@@ -106,9 +124,9 @@ export class CacheApiAdaptor {
 
     const headers = new Headers();
 
-    headers.append('cache-control', `max-age=${maxAge}`);
-    headers.append(HEADER, 'true');
-    headers.append(HEADER_DATE, Date.now().toString());
+    headers.set('cache-control', `max-age=${maxAge}`);
+    headers.set(HEADER, 'true');
+    headers.set(HEADER_DATE, Date.now().toString());
 
     const response = new Response(JSON.stringify(value), {
       headers,
