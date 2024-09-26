@@ -1,3 +1,14 @@
+## 0.7.1 (2024-09-26)
+
+
+### 🩹 Fixes
+
+- **build:** better handling commonjs ([a0c85f1](https://github.com/anymaniax/cf-workers-query/commit/a0c85f1))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.7.0 (2024-09-09)
 
 
