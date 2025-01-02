@@ -1,3 +1,18 @@
+## 0.8.0 (2025-01-02)
+
+
+### 🚀 Features
+
+- **create-query:** new revalidate mode probabilistic ([264b6b9](https://github.com/anymaniax/cf-workers-query/commit/264b6b9))
+
+### 🩹 Fixes
+
+- **build:** better handling commonjs ([a0c85f1](https://github.com/anymaniax/cf-workers-query/commit/a0c85f1))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.7.1 (2024-09-26)
 
 
