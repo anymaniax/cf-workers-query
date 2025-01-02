@@ -1,6 +1,6 @@
-import { ExecutionContext, getCFExecutionContext } from './context';
-import { CacheApiAdaptor, QueryKey } from './cache-api';
 import { nanoid } from 'nanoid';
+import { CacheApiAdaptor, QueryKey } from './cache-api';
+import { ExecutionContext, getCFExecutionContext } from './context';
 
 export type RetryDelay<Error = unknown> =
   | number
@@ -18,6 +18,7 @@ export type CreateQuery<Data = unknown, Error = unknown> = {
   cacheName?: string;
   throwOnError?: boolean;
   enabled?: boolean | ((data: Data) => boolean);
+  revalidateMode?: 'default' | 'probabilistic';
 };
 
 export const createQuery = async <Data = unknown, Error = unknown>({
@@ -32,10 +33,12 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   cacheName,
   throwOnError,
   enabled = true,
+  revalidateMode = 'default',
 }: CreateQuery<Data, Error>): Promise<{
   data: Data | null;
   error: Error | null;
   invalidate: () => Promise<void> | void;
+  lastModified: number | null;
 }> => {
   try {
     if (!queryKey || !enabled || !gcTime) {
@@ -46,7 +49,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
         throwOnError,
       });
 
-      return { data, error, invalidate: () => undefined };
+      return { data, error, invalidate: () => undefined, lastModified: null };
     }
 
     const cache = new CacheApiAdaptor({ maxAge: gcTime, cacheName });
@@ -70,37 +73,52 @@ export const createQuery = async <Data = unknown, Error = unknown>({
           staleTime && cachedData.lastModified + staleTime * 1000 < Date.now();
 
         if (isStale && context) {
-          const staleId = nanoid();
+          const shouldRevalidate =
+            revalidateMode === 'probabilistic'
+              ? shouldRevalidateByProbability(
+                  cachedData.lastModified,
+                  cachedData.maxAge
+                )
+              : true;
 
-          const dedupeKey =
-            cacheKey instanceof URL
-              ? new URL(cacheKey)
-              : [...cacheKey, 'dedupe'];
+          if (shouldRevalidate) {
+            const staleId = nanoid();
 
-          if (dedupeKey instanceof URL) {
-            dedupeKey.searchParams.set('dedupe', 'true');
-          }
+            const dedupeKey =
+              cacheKey instanceof URL
+                ? new URL(cacheKey)
+                : [...cacheKey, 'dedupe'];
 
-          await cache.update(dedupeKey, staleId, { maxAge: 60 });
-
-          const refreshFunc = async () => {
-            const { data: cachedStaleId } =
-              (await cache.retrieve<string>(dedupeKey)) ?? {};
-
-            if (cachedStaleId && cachedStaleId !== staleId) {
-              return;
+            if (dedupeKey instanceof URL) {
+              dedupeKey.searchParams.set('dedupe', 'true');
             }
 
-            const newData = await queryFn();
-            await cache.update(cacheKey, newData);
-          };
+            await cache.update(dedupeKey, staleId, { maxAge: 60 });
 
-          context.waitUntil(refreshFunc());
-        }
+            const refreshFunc = async () => {
+              const { data: cachedStaleId } =
+                (await cache.retrieve<string>(dedupeKey)) ?? {};
 
-        if (!isStale || (isStale && context)) {
-          if (typeof enabled !== 'function' || enabled(cachedData.data)) {
-            return { data: cachedData.data, error: null, invalidate };
+              if (cachedStaleId && cachedStaleId !== staleId) {
+                return;
+              }
+
+              const newData = await queryFn();
+              await cache.update(cacheKey, newData);
+            };
+
+            context.waitUntil(refreshFunc());
+          }
+
+          if (!isStale || (isStale && context)) {
+            if (typeof enabled !== 'function' || enabled(cachedData.data)) {
+              return {
+                data: cachedData.data,
+                error: null,
+                invalidate,
+                lastModified: cachedData.lastModified,
+              };
+            }
           }
         }
       }
@@ -114,7 +132,12 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     });
 
     if (error || !data) {
-      return { data: null, error, invalidate: () => undefined };
+      return {
+        data: null,
+        error,
+        invalidate: () => undefined,
+        lastModified: null,
+      };
     }
 
     if (typeof enabled !== 'function' || enabled(data)) {
@@ -127,13 +150,18 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       }
     }
 
-    return { data, error: null, invalidate };
+    return { data, error: null, invalidate, lastModified: null };
   } catch (e) {
     if (throwOnError) {
       throw e;
     }
 
-    return { data: null, error: e as Error, invalidate: () => undefined };
+    return {
+      data: null,
+      error: e as Error,
+      invalidate: () => undefined,
+      lastModified: null,
+    };
   }
 };
 
@@ -198,3 +226,30 @@ const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
     return { data: null, error: e as Error };
   }
 };
+
+// based on https://blog.cloudflare.com/sometimes-i-cache
+// https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf
+function shouldRevalidateByProbability(lastModified: number, maxAge: number) {
+  const expirationDate = new Date(lastModified + maxAge * 1000);
+  let remainingCacheTimeInS = (expirationDate.getTime() - Date.now()) / 1000;
+
+  const cacheRevalidationIntervalInS = maxAge;
+
+  if (remainingCacheTimeInS > cacheRevalidationIntervalInS) {
+    return false;
+  }
+  if (remainingCacheTimeInS <= 0) {
+    return true;
+  }
+
+  const revalidationSteepness = 1 / cacheRevalidationIntervalInS;
+
+  // p(t) is evaluated here
+  return (
+    Math.random() >
+    Math.exp(
+      -revalidationSteepness *
+        (cacheRevalidationIntervalInS - remainingCacheTimeInS)
+    )
+  );
+}

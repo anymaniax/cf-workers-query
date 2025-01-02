@@ -35,7 +35,7 @@ export default {
       gcTime: 60 * 1000,
       executionCtx: ctx,
     });
-    
+
     return new Response(JSON.stringify(data), {
       headers: {
         'content-type': 'application/json',
@@ -66,7 +66,7 @@ app.get('/user/:id', cache({
     const user = await fetchUser(ctx.req.param('id'));
     return ctx.json(user)
   },
-  cacheKey: (ctx) => ['user', ctx.req.param('id')], 
+  cacheKey: (ctx) => ['user', ctx.req.param('id')],
   cacheTime: 60 * 60,
   staleTime: 60
 }));
@@ -100,6 +100,12 @@ Description: Optional. The amount of time in milliseconds to keep unused data in
 Type: boolean
 
 Description: Optional. If true, the query will directly revalidate data.
+
+### revalidateMode
+
+Type: default | probabilistic
+
+Description: Optional. If probabilistic if data is stale will use a probabilistic function to maybe revalidate data. Based on https://blog.cloudflare.com/sometimes-i-cache
 
 ### retry
 Type: number | ((failureCount: number, error: Error) => boolean)
