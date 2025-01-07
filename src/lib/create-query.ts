@@ -131,7 +131,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       throwOnError,
     });
 
-    if (error || !data) {
+    if (error) {
       return {
         data: null,
         error,
