@@ -1,3 +1,14 @@
+## 0.8.1 (2025-01-07)
+
+
+### 🩹 Fixes
+
+- **create-query:** return data even if data is falsy ([60644bb](https://github.com/anymaniax/cf-workers-query/commit/60644bb))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.8.0 (2025-01-02)
 
 
