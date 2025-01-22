@@ -1,3 +1,14 @@
+## 0.8.2 (2025-01-22)
+
+
+### 🩹 Fixes
+
+- **create-query:** return cache properly ([5a87607](https://github.com/anymaniax/cf-workers-query/commit/5a87607))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.8.1 (2025-01-07)
 
 
