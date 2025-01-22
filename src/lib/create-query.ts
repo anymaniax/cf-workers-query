@@ -109,16 +109,16 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 
             context.waitUntil(refreshFunc());
           }
+        }
 
-          if (!isStale || (isStale && context)) {
-            if (typeof enabled !== 'function' || enabled(cachedData.data)) {
-              return {
-                data: cachedData.data,
-                error: null,
-                invalidate,
-                lastModified: cachedData.lastModified,
-              };
-            }
+        if (!isStale || (isStale && context)) {
+          if (typeof enabled !== 'function' || enabled(cachedData.data)) {
+            return {
+              data: cachedData.data,
+              error: null,
+              invalidate,
+              lastModified: cachedData.lastModified,
+            };
           }
         }
       }
