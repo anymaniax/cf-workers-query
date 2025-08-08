@@ -1,3 +1,14 @@
+## 0.9.0 (2025-08-08)
+
+
+### 🚀 Features
+
+- **cloudflare:** use the new wait until function from cloudflare ([4aee378](https://github.com/anymaniax/cf-workers-query/commit/4aee378))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.8.2 (2025-01-22)
 
 
