@@ -28,7 +28,7 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240722.0",
+    "@cloudflare/workers-types": "^4.20250807.0",
     "@nx/eslint": "19.5.2",
     "@nx/eslint-plugin": "19.5.2",
     "@nx/js": "19.5.2",

@@ -6,8 +6,15 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/lib/hono.ts'],
   format: ['cjs', 'esm'],
   outDir: 'dist/src',
-  dts: true,
+  dts: {
+    resolve: true,
+    compilerOptions: {
+      skipLibCheck: true,
+    },
+  },
   clean: true,
+  external: ['cloudflare:workers'],
+  tsconfig: 'tsconfig.lib.json',
   onSuccess: async () => {
     const files = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md'];
     for (const file of files) {

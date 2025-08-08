@@ -7,7 +7,7 @@ type CacheKey = QueryKey | ((ctx: Context) => QueryKey);
 
 type CacheOptions = Omit<
   CreateQuery,
-  'queryKey' | 'queryFn' | 'executionCtx' | 'throwOnError' | 'revalidate'
+  'queryKey' | 'queryFn' | 'throwOnError' | 'revalidate'
 > & {
   cacheKey: CacheKey;
   handler: Handler;
@@ -26,7 +26,6 @@ export const cache =
       ...options,
       queryKey: typeof cacheKey === 'function' ? cacheKey(ctx) : cacheKey,
       queryFn: () => handler(ctx, next),
-      executionCtx: ctx.executionCtx,
       throwOnError: true,
       ...(revalidate
         ? {

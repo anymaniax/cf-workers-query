@@ -1,6 +1,6 @@
+import { waitUntil } from 'cloudflare:workers';
 import { nanoid } from 'nanoid';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
-import { ExecutionContext, getCFExecutionContext } from './context';
 
 export type RetryDelay<Error = unknown> =
   | number
@@ -14,7 +14,6 @@ export type CreateQuery<Data = unknown, Error = unknown> = {
   revalidate?: boolean;
   retry?: number | ((failureCount: number, error: Error) => boolean);
   retryDelay?: RetryDelay<Error>;
-  executionCtx?: ExecutionContext;
   cacheName?: string;
   throwOnError?: boolean;
   enabled?: boolean | ((data: Data) => boolean);
@@ -29,7 +28,6 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   revalidate,
   retry,
   retryDelay,
-  executionCtx,
   cacheName,
   throwOnError,
   enabled = true,
@@ -57,14 +55,6 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     const cacheKey = queryKey;
     const invalidate = () => cache.delete(cacheKey);
 
-    const context = (executionCtx ?? getCFExecutionContext()) as
-      | ExecutionContext
-      | undefined;
-
-    if (!context && !!staleTime) {
-      console.warn('Context not found, staleTime will be ignored');
-    }
-
     if (!revalidate && staleTime !== 0) {
       const cachedData = await cache.retrieve<Data>(cacheKey);
 
@@ -72,7 +62,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
         const isStale =
           staleTime && cachedData.lastModified + staleTime * 1000 < Date.now();
 
-        if (isStale && context) {
+        if (isStale) {
           const shouldRevalidate =
             revalidateMode === 'probabilistic'
               ? shouldRevalidateByProbability(
@@ -107,11 +97,11 @@ export const createQuery = async <Data = unknown, Error = unknown>({
               await cache.update(cacheKey, newData);
             };
 
-            context.waitUntil(refreshFunc());
+            waitUntil(refreshFunc());
           }
         }
 
-        if (!isStale || (isStale && context)) {
+        if (!isStale) {
           if (typeof enabled !== 'function' || enabled(cachedData.data)) {
             return {
               data: cachedData.data,
@@ -143,11 +133,7 @@ export const createQuery = async <Data = unknown, Error = unknown>({
     if (typeof enabled !== 'function' || enabled(data)) {
       const cacheData = data instanceof Response ? data.clone() : data;
 
-      if (context) {
-        context.waitUntil(cache.update<Data>(cacheKey, cacheData));
-      } else {
-        await cache.update<Data>(cacheKey, cacheData);
-      }
+      waitUntil(cache.update<Data>(cacheKey, cacheData));
     }
 
     return { data, error: null, invalidate, lastModified: null };
@@ -231,7 +217,7 @@ const handleQueryFnWithRetry = async <Data = unknown, Error = unknown>({
 // https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf
 function shouldRevalidateByProbability(lastModified: number, maxAge: number) {
   const expirationDate = new Date(lastModified + maxAge * 1000);
-  let remainingCacheTimeInS = (expirationDate.getTime() - Date.now()) / 1000;
+  const remainingCacheTimeInS = (expirationDate.getTime() - Date.now()) / 1000;
 
   const cacheRevalidationIntervalInS = maxAge;
 
