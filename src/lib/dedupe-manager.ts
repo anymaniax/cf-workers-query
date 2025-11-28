@@ -2,51 +2,39 @@ import { CacheApiAdaptor, QueryKey } from './cache-api';
 
 /**
  * Global deduplication manager for query execution
- * 
- * This module provides a two-tier deduplication strategy:
- * 1. In-memory Map for same-request deduplication (within a single worker instance)
- * 2. CacheApiAdaptor for cross-request/cross-worker deduplication
+ *
+ * Uses CacheApiAdaptor for distributed deduplication across worker requests/instances.
  * 
  * Benefits:
- * - Prevents multiple concurrent identical queries in the same worker instance
  * - Prevents redundant queries across multiple worker instances via distributed cache
- * - Automatically cleans up completed promises from memory
  * - Short-lived cache entries (5s) minimize storage while providing effective deduplication
  * - Uses CacheApiAdaptor for consistent cache management across the library
+ * - No global state or timers - works within Cloudflare Workers constraints
  */
 
-type PendingPromise<T = unknown> = {
-  promise: Promise<T>;
-  timestamp: number;
-};
-
-class DedupeManager {
-  private pendingPromises = new Map<string, PendingPromise>();
-  private readonly PENDING_CLEANUP_INTERVAL = 5000; // 5 seconds
+export class DedupeManager {
   private readonly CACHE_LOCK_TTL = 5; // 5 seconds
-  private cleanupTimer: NodeJS.Timeout | number | null = null;
   private lockCache: CacheApiAdaptor;
   private resultCache: CacheApiAdaptor;
 
   constructor() {
-    this.lockCache = new CacheApiAdaptor({ 
-      cacheName: 'cf-workers-query-locks', 
-      maxAge: this.CACHE_LOCK_TTL 
+    this.lockCache = new CacheApiAdaptor({
+      cacheName: 'cf-workers-query-locks',
+      maxAge: this.CACHE_LOCK_TTL
     });
-    this.resultCache = new CacheApiAdaptor({ 
-      cacheName: 'cf-workers-query-results', 
-      maxAge: this.CACHE_LOCK_TTL 
+    this.resultCache = new CacheApiAdaptor({
+      cacheName: 'cf-workers-query-results',
+      maxAge: this.CACHE_LOCK_TTL
     });
-    this.startCleanup();
   }
 
   /**
    * Deduplicate async function execution
-   * 
-   * If the same key is requested multiple times concurrently:
-   * 1. First request executes the function
-   * 2. Subsequent requests wait for the first request to complete
-   * 
+   *
+   * If the same key is requested by multiple workers/requests concurrently:
+   * 1. First request acquires lock and executes the function
+   * 2. Subsequent requests wait for the result from cache
+   *
    * @param key - Unique identifier for the operation (QueryKey or string)
    * @param fn - Async function to deduplicate
    * @returns Result of the function execution
@@ -55,36 +43,19 @@ class DedupeManager {
     key: QueryKey | string,
     fn: () => Promise<T>
   ): Promise<T> {
-    const stringKey = this.normalizeKey(key);
-    
-    // Check in-memory pending promises first (fastest)
-    const pending = this.pendingPromises.get(stringKey);
-    if (pending) {
-      return pending.promise as Promise<T>;
-    }
-
     // Try to acquire distributed lock via cache
     const lockAcquired = await this.tryAcquireLock(key);
-    
+
     if (!lockAcquired) {
       // Another worker/request is handling this, poll for result
       return this.waitForResult<T>(key, fn);
     }
 
     // We acquired the lock, execute the function
-    const promise = this.executeWithLock<T>(key, fn);
-    
-    this.pendingPromises.set(stringKey, {
-      promise: promise as Promise<unknown>,
-      timestamp: Date.now(),
-    });
-
     try {
-      const result = await promise;
+      const result = await this.executeWithLock<T>(key, fn);
       return result;
     } finally {
-      // Clean up this specific promise
-      this.pendingPromises.delete(stringKey);
       await this.releaseLock(key);
     }
   }
@@ -100,7 +71,7 @@ class DedupeManager {
 
     try {
       const lockKey = this.buildLockKey(key);
-      
+
       // Check if lock already exists
       const existing = await this.lockCache.retrieve<{ acquired: number; id: string }>(lockKey);
       if (existing?.data) {
@@ -115,7 +86,7 @@ class DedupeManager {
       };
 
       await this.lockCache.update(lockKey, lockValue);
-      
+
       // Verify we actually got the lock (handle race conditions)
       const verification = await this.lockCache.retrieve<{ acquired: number; id: string }>(lockKey);
       if (verification?.data) {
@@ -154,10 +125,10 @@ class DedupeManager {
   ): Promise<T> {
     try {
       const result = await fn();
-      
+
       // Store result briefly in cache for other workers to pick up
       await this.cacheResult(key, result);
-      
+
       return result;
     } catch (error) {
       // Cache the error as well
@@ -237,19 +208,6 @@ class DedupeManager {
   }
 
   /**
-   * Normalize a key to a string for in-memory map
-   */
-  private normalizeKey(key: QueryKey | string): string {
-    if (typeof key === 'string') {
-      return key;
-    }
-    if (key instanceof URL) {
-      return key.toString();
-    }
-    return JSON.stringify(key);
-  }
-
-  /**
    * Build lock key for cache
    */
   private buildLockKey(key: QueryKey | string): QueryKey {
@@ -278,53 +236,4 @@ class DedupeManager {
     }
     return ['dedupe-result', ...key];
   }
-
-  /**
-   * Periodically clean up old pending promises from memory
-   */
-  private startCleanup(): void {
-    if (this.cleanupTimer) {
-      return;
-    }
-
-    this.cleanupTimer = setInterval(() => {
-      const now = Date.now();
-      const toDelete: string[] = [];
-
-      for (const [key, pending] of this.pendingPromises.entries()) {
-        if (now - pending.timestamp > this.PENDING_CLEANUP_INTERVAL) {
-          toDelete.push(key);
-        }
-      }
-
-      toDelete.forEach(key => this.pendingPromises.delete(key));
-    }, this.PENDING_CLEANUP_INTERVAL) as any;
-  }
-
-  /**
-   * Stop cleanup timer (for testing or shutdown)
-   */
-  stopCleanup(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer as any);
-      this.cleanupTimer = null;
-    }
-  }
-
-  /**
-   * Clear all pending promises (for testing)
-   */
-  clear(): void {
-    this.pendingPromises.clear();
-  }
-
-  /**
-   * Get current pending count (for debugging/testing)
-   */
-  getPendingCount(): number {
-    return this.pendingPromises.size;
-  }
 }
-
-// Export singleton instance
-export const dedupeManager = new DedupeManager();

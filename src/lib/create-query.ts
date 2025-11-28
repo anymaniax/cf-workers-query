@@ -1,7 +1,7 @@
 import { waitUntil } from 'cloudflare:workers';
 import { nanoid } from 'nanoid';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
-import { dedupeManager } from './dedupe-manager';
+import { DedupeManager } from './dedupe-manager';
 
 export type RetryDelay<Error = unknown> =
   | number
@@ -39,6 +39,8 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   invalidate: () => Promise<void> | void;
   lastModified: number | null;
 }> => {
+  const dedupeManager = new DedupeManager();
+  
   try {
     if (!queryKey || !enabled || !gcTime) {
       const { data, error } = await dedupeManager.dedupe(
