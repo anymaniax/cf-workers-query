@@ -1,3 +1,14 @@
+## 0.10.1 (2025-11-28)
+
+
+### 🩹 Fixes
+
+- **dedupe manager:** working properly ([e3493d3](https://github.com/anymaniax/cf-workers-query/commit/e3493d3))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.10.0 (2025-11-28)
 
 
