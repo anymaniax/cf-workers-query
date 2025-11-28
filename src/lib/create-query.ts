@@ -1,6 +1,7 @@
 import { waitUntil } from 'cloudflare:workers';
 import { nanoid } from 'nanoid';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
+import { dedupeManager } from './dedupe-manager';
 
 export type RetryDelay<Error = unknown> =
   | number
@@ -40,12 +41,15 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 }> => {
   try {
     if (!queryKey || !enabled || !gcTime) {
-      const { data, error } = await handleQueryFnWithRetry<Data, Error>({
-        queryFn,
-        retry,
-        retryDelay,
-        throwOnError,
-      });
+      const { data, error } = await dedupeManager.dedupe(
+        queryKey ?? nanoid(),
+        () => handleQueryFnWithRetry<Data, Error>({
+          queryFn,
+          retry,
+          retryDelay,
+          throwOnError,
+        })
+      );
 
       return { data, error, invalidate: () => undefined, lastModified: null };
     }
@@ -72,29 +76,19 @@ export const createQuery = async <Data = unknown, Error = unknown>({
               : true;
 
           if (shouldRevalidate) {
-            const staleId = nanoid();
-
-            const dedupeKey =
-              cacheKey instanceof URL
-                ? new URL(cacheKey)
-                : [...cacheKey, 'dedupe'];
-
-            if (dedupeKey instanceof URL) {
-              dedupeKey.searchParams.set('dedupe', 'true');
-            }
-
-            await cache.update(dedupeKey, staleId, { maxAge: 60 });
-
             const refreshFunc = async () => {
-              const { data: cachedStaleId } =
-                (await cache.retrieve<string>(dedupeKey)) ?? {};
-
-              if (cachedStaleId && cachedStaleId !== staleId) {
-                return;
-              }
-
-              const newData = await queryFn();
-              await cache.update(cacheKey, newData);
+              const refreshKey = cacheKey instanceof URL 
+                ? new URL(cacheKey.toString() + ':refresh')
+                : [...cacheKey, 'refresh'];
+              
+              await dedupeManager.dedupe(
+                refreshKey,
+                async () => {
+                  const newData = await queryFn();
+                  await cache.update(cacheKey, newData);
+                  return { data: newData, error: null };
+                }
+              );
             };
 
             waitUntil(refreshFunc());
@@ -114,12 +108,15 @@ export const createQuery = async <Data = unknown, Error = unknown>({
       }
     }
 
-    const { data, error } = await handleQueryFnWithRetry<Data, Error>({
-      queryFn,
-      retry,
-      retryDelay,
-      throwOnError,
-    });
+    const { data, error } = await dedupeManager.dedupe(
+      cacheKey,
+      () => handleQueryFnWithRetry<Data, Error>({
+        queryFn,
+        retry,
+        retryDelay,
+        throwOnError,
+      })
+    );
 
     if (error) {
       return {
