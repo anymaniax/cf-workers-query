@@ -1,3 +1,14 @@
+## 0.10.0 (2025-11-28)
+
+
+### 🚀 Features
+
+- **create-query:** add dedupe manager ([0644853](https://github.com/anymaniax/cf-workers-query/commit/0644853))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.9.0 (2025-08-08)
 
 
