@@ -1,3 +1,14 @@
+## 0.10.3 (2026-01-15)
+
+
+### 🩹 Fixes
+
+- **hono:** handler type ([f5aa330](https://github.com/anymaniax/cf-workers-query/commit/f5aa330))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.10.2 (2026-01-15)
 
 
