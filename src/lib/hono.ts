@@ -1,7 +1,7 @@
-import { Context, Handler, MiddlewareHandler } from 'hono';
-import { createQuery, CreateQuery } from './create-query';
-import { QueryKey } from './cache-api';
+import { Context, Handler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { QueryKey } from './cache-api';
+import { createQuery, CreateQuery } from './create-query';
 
 type CacheKey = QueryKey | ((ctx: Context) => QueryKey);
 
@@ -10,24 +10,22 @@ type CacheOptions = Omit<
   'queryKey' | 'queryFn' | 'throwOnError' | 'revalidate'
 > & {
   cacheKey: CacheKey;
-  handler: Handler;
+  handler: (ctx: Context) => Response | Promise<Response>;
   revalidate?: boolean | ((ctx: Context) => boolean);
 };
 
 export const cache =
-  <E = {}>(
-    {
-      cacheKey,
-      handler,
-      revalidate,
-      ...options
-    }: CacheOptions
-  ): MiddlewareHandler<E> =>
-  async (ctx, next) => {
+  <E = {}>({
+    cacheKey,
+    handler,
+    revalidate,
+    ...options
+  }: CacheOptions): Handler<E> =>
+  async (ctx) => {
     const { data: response, error } = await createQuery<Response>({
       ...options,
       queryKey: typeof cacheKey === 'function' ? cacheKey(ctx) : cacheKey,
-      queryFn: () => handler(ctx, next),
+      queryFn: () => Promise.resolve(handler(ctx)),
       throwOnError: true,
       ...(revalidate
         ? {
