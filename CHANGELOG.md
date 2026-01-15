@@ -1,3 +1,14 @@
+## 0.10.4 (2026-01-15)
+
+
+### 🩹 Fixes
+
+- **create-query:** return stale data ([90cf34d](https://github.com/anymaniax/cf-workers-query/commit/90cf34d))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.10.3 (2026-01-15)
 
 
