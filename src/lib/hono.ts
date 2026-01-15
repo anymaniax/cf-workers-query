@@ -15,12 +15,14 @@ type CacheOptions = Omit<
 };
 
 export const cache =
-  ({
-    cacheKey,
-    handler,
-    revalidate,
-    ...options
-  }: CacheOptions): MiddlewareHandler =>
+  <E = {}>(
+    {
+      cacheKey,
+      handler,
+      revalidate,
+      ...options
+    }: CacheOptions
+  ): MiddlewareHandler<E> =>
   async (ctx, next) => {
     const { data: response, error } = await createQuery<Response>({
       ...options,
