@@ -1,3 +1,14 @@
+## 0.10.2 (2026-01-15)
+
+
+### 🩹 Fixes
+
+- **hono:** type ([f130633](https://github.com/anymaniax/cf-workers-query/commit/f130633))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.10.1 (2025-11-28)
 
 
