@@ -40,17 +40,18 @@ export const createQuery = async <Data = unknown, Error = unknown>({
   lastModified: number | null;
 }> => {
   const dedupeManager = new DedupeManager();
-  
+
   try {
     if (!queryKey || !enabled || !gcTime) {
       const { data, error } = await dedupeManager.dedupe(
         queryKey ?? nanoid(),
-        () => handleQueryFnWithRetry<Data, Error>({
-          queryFn,
-          retry,
-          retryDelay,
-          throwOnError,
-        })
+        () =>
+          handleQueryFnWithRetry<Data, Error>({
+            queryFn,
+            retry,
+            retryDelay,
+            throwOnError,
+          })
       );
 
       return { data, error, invalidate: () => undefined, lastModified: null };
@@ -79,40 +80,35 @@ export const createQuery = async <Data = unknown, Error = unknown>({
 
           if (shouldRevalidate) {
             const refreshFunc = async () => {
-              const refreshKey = cacheKey instanceof URL 
-                ? new URL(cacheKey.toString() + ':refresh')
-                : [...cacheKey, 'refresh'];
-              
-              await dedupeManager.dedupe(
-                refreshKey,
-                async () => {
-                  const newData = await queryFn();
-                  await cache.update(cacheKey, newData);
-                  return { data: newData, error: null };
-                }
-              );
+              const refreshKey =
+                cacheKey instanceof URL
+                  ? new URL(cacheKey.toString() + ':refresh')
+                  : [...cacheKey, 'refresh'];
+
+              await dedupeManager.dedupe(refreshKey, async () => {
+                const newData = await queryFn();
+                await cache.update(cacheKey, newData);
+                return { data: newData, error: null };
+              });
             };
 
             waitUntil(refreshFunc());
           }
         }
 
-        if (!isStale) {
-          if (typeof enabled !== 'function' || enabled(cachedData.data)) {
-            return {
-              data: cachedData.data,
-              error: null,
-              invalidate,
-              lastModified: cachedData.lastModified,
-            };
-          }
+        if (typeof enabled !== 'function' || enabled(cachedData.data)) {
+          return {
+            data: cachedData.data,
+            error: null,
+            invalidate,
+            lastModified: cachedData.lastModified,
+          };
         }
       }
     }
 
-    const { data, error } = await dedupeManager.dedupe(
-      cacheKey,
-      () => handleQueryFnWithRetry<Data, Error>({
+    const { data, error } = await dedupeManager.dedupe(cacheKey, () =>
+      handleQueryFnWithRetry<Data, Error>({
         queryFn,
         retry,
         retryDelay,
