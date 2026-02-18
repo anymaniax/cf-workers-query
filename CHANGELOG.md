@@ -1,3 +1,14 @@
+## 0.11.0 (2026-02-18)
+
+
+### 🚀 Features
+
+- **global:** multiple improvements ([0892223](https://github.com/anymaniax/cf-workers-query/commit/0892223))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.10.4 (2026-01-15)
 
 
