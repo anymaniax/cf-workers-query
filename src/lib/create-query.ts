@@ -157,35 +157,43 @@ export const createQuery = async <Data = unknown, TError = unknown>({
     }
 
     if (typeof enabled !== 'function' || enabled(data as Data)) {
-      // For streaming Responses, use a manual pump to stream to caller
-      // while collecting bytes for cache in the background.
-      // Manual pump starts eagerly (pipeThrough waits for consumer pull,
-      // which can trigger CF Workers hung detection).
       if (data instanceof Response && data.body) {
         const chunks: Uint8Array[] = [];
         let totalLength = 0;
         let pumpSuccess = false;
+        let pumpResolve: () => void;
+        const pumpDone = new Promise<void>((r) => {
+          pumpResolve = r;
+        });
 
-        const { readable, writable } = new TransformStream<Uint8Array>();
-        const writer = writable.getWriter();
         const reader = (data as Response).body!.getReader();
 
-        const pumpDone = (async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(new Uint8Array(value));
-              totalLength += value.byteLength;
-              await writer.write(value);
-            }
-            await writer.close();
-            pumpSuccess = true;
-          } catch (e) {
-            reader.releaseLock();
-            await writer.abort(e);
-          }
-        })();
+        const readable = new ReadableStream<Uint8Array>({
+          start(controller) {
+            (async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    controller.close();
+                    pumpSuccess = true;
+                    break;
+                  }
+                  chunks.push(new Uint8Array(value));
+                  totalLength += value.byteLength;
+                  controller.enqueue(value);
+                }
+              } catch {
+                reader.releaseLock();
+              }
+              pumpResolve();
+            })();
+          },
+          cancel() {
+            reader.cancel().catch(() => {});
+            pumpResolve();
+          },
+        });
 
         const responseInit = {
           status: (data as Response).status,
