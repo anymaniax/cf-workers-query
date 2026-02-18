@@ -1,3 +1,14 @@
+## 0.11.2 (2026-02-18)
+
+
+### 🩹 Fixes
+
+- **create-query:** improve streaming ([4764bfa](https://github.com/anymaniax/cf-workers-query/commit/4764bfa))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.1 (2026-02-18)
 
 
