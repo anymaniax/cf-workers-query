@@ -1,3 +1,14 @@
+## 0.11.1 (2026-02-18)
+
+
+### 🩹 Fixes
+
+- **create-query:** use passthrough to not wait the all stream ([6f62c14](https://github.com/anymaniax/cf-workers-query/commit/6f62c14))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.0 (2026-02-18)
 
 
