@@ -143,7 +143,51 @@ export const createQuery = async <Data = unknown, TError = unknown>({
     }
 
     if (typeof enabled !== 'function' || enabled(data as Data)) {
-      data = await cache.update<Data>(cacheKey, data as Data);
+      // For streaming Responses, use passthrough to stream to caller
+      // while collecting bytes for cache in the background
+      if (data instanceof Response && data.body) {
+        const chunks: Uint8Array[] = [];
+        let totalLength = 0;
+        let cancelled = false;
+        let resolveComplete: (cached: boolean) => void;
+        const complete = new Promise<boolean>((r) => {
+          resolveComplete = r;
+        });
+
+        const passthrough = new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            chunks.push(new Uint8Array(chunk));
+            totalLength += chunk.byteLength;
+            controller.enqueue(chunk);
+          },
+          flush() {
+            resolveComplete(true);
+          },
+          cancel() {
+            cancelled = true;
+            resolveComplete(false);
+          },
+        });
+
+        const clientBody = data.body.pipeThrough(passthrough);
+        const responseInit = {
+          status: data.status,
+          statusText: data.statusText,
+          headers: data.headers,
+        };
+
+        waitUntil(
+          complete.then(async (shouldCache) => {
+            if (!shouldCache || cancelled) return;
+            const buffer = concatUint8Arrays(chunks, totalLength);
+            await cache.update(cacheKey, new Response(buffer, responseInit));
+          })
+        );
+
+        data = new Response(clientBody, responseInit) as Data;
+      } else {
+        data = await cache.update<Data>(cacheKey, data as Data);
+      }
     }
 
     return { data, error: null, invalidate, lastModified: null };
@@ -225,6 +269,19 @@ const handleQueryFnWithRetry = async <Data = unknown, TError = unknown>({
     return { data: null, error: e as TError };
   }
 };
+
+function concatUint8Arrays(
+  chunks: Uint8Array[],
+  totalLength: number
+): ArrayBuffer {
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result.buffer as ArrayBuffer;
+}
 
 // based on https://blog.cloudflare.com/sometimes-i-cache
 // https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf
