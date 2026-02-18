@@ -74,16 +74,21 @@ export const createQuery = async <Data = unknown, TError = unknown>({
               : true;
 
           if (shouldRevalidate) {
-            const alreadyRefreshing = await dedupeManager.isProcessing(cacheKey);
+            let alreadyRefreshing = false;
+            try {
+              alreadyRefreshing = await dedupeManager.isProcessing(cacheKey);
+            } catch {
+              // Best-effort dedup
+            }
             if (!alreadyRefreshing) {
-              await dedupeManager.markProcessing(cacheKey);
+              dedupeManager.markProcessing(cacheKey).catch(() => {});
               waitUntil(
                 (async () => {
                   try {
                     const newData = await queryFn();
                     await cache.update(cacheKey, newData);
                   } finally {
-                    await dedupeManager.clearProcessing(cacheKey);
+                    await dedupeManager.clearProcessing(cacheKey).catch(() => {});
                   }
                 })()
               );
@@ -102,36 +107,45 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       }
     }
 
-    // Initial fetch path - dedup attempt but proceed if needed
-    const alreadyProcessing = await dedupeManager.isProcessing(cacheKey);
-    if (alreadyProcessing) {
-      // Brief wait then check cache - another request may have written the result
-      await new Promise((r) => setTimeout(r, 50));
-      const freshCache = await cache.retrieve<Data>(cacheKey);
-      if (freshCache?.data) {
-        return {
-          data: freshCache.data,
-          error: null,
-          invalidate,
-          lastModified: freshCache.lastModified,
-        };
+    // Initial fetch path - best-effort dedup (never blocks response on cache failures)
+    try {
+      const alreadyProcessing = await dedupeManager.isProcessing(cacheKey);
+      if (alreadyProcessing) {
+        await new Promise((r) => setTimeout(r, 50));
+        const freshCache = await cache.retrieve<Data>(cacheKey);
+        if (freshCache?.data) {
+          return {
+            data: freshCache.data,
+            error: null,
+            invalidate,
+            lastModified: freshCache.lastModified,
+          };
+        }
       }
+    } catch {
+      // Cache API issue - proceed with fetch
     }
 
-    // Mark as processing, fetch, then clear
-    await dedupeManager.markProcessing(cacheKey);
-    let data: Data | null;
-    let error: TError | null;
     try {
-      ({ data, error } = await handleQueryFnWithRetry<Data, TError>({
-        queryFn,
-        retry,
-        retryDelay,
-        throwOnError,
-      }));
-    } finally {
-      await dedupeManager.clearProcessing(cacheKey);
+      await dedupeManager.markProcessing(cacheKey);
+    } catch {
+      // Best-effort, proceed without marker
     }
+
+    const { data: fetchedData, error } = await handleQueryFnWithRetry<
+      Data,
+      TError
+    >({
+      queryFn,
+      retry,
+      retryDelay,
+      throwOnError,
+    });
+
+    // Clear marker in background - never block the response
+    waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+
+    let data: Data | null = fetchedData;
 
     if (error) {
       return {
@@ -143,48 +157,51 @@ export const createQuery = async <Data = unknown, TError = unknown>({
     }
 
     if (typeof enabled !== 'function' || enabled(data as Data)) {
-      // For streaming Responses, use passthrough to stream to caller
-      // while collecting bytes for cache in the background
+      // For streaming Responses, use a manual pump to stream to caller
+      // while collecting bytes for cache in the background.
+      // Manual pump starts eagerly (pipeThrough waits for consumer pull,
+      // which can trigger CF Workers hung detection).
       if (data instanceof Response && data.body) {
         const chunks: Uint8Array[] = [];
         let totalLength = 0;
-        let cancelled = false;
-        let resolveComplete: (cached: boolean) => void;
-        const complete = new Promise<boolean>((r) => {
-          resolveComplete = r;
-        });
+        let pumpSuccess = false;
 
-        const passthrough = new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, controller) {
-            chunks.push(new Uint8Array(chunk));
-            totalLength += chunk.byteLength;
-            controller.enqueue(chunk);
-          },
-          flush() {
-            resolveComplete(true);
-          },
-          cancel() {
-            cancelled = true;
-            resolveComplete(false);
-          },
-        });
+        const { readable, writable } = new TransformStream<Uint8Array>();
+        const writer = writable.getWriter();
+        const reader = (data as Response).body!.getReader();
 
-        const clientBody = data.body.pipeThrough(passthrough);
+        const pumpDone = (async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(new Uint8Array(value));
+              totalLength += value.byteLength;
+              await writer.write(value);
+            }
+            await writer.close();
+            pumpSuccess = true;
+          } catch (e) {
+            reader.releaseLock();
+            await writer.abort(e);
+          }
+        })();
+
         const responseInit = {
-          status: data.status,
-          statusText: data.statusText,
-          headers: data.headers,
+          status: (data as Response).status,
+          statusText: (data as Response).statusText,
+          headers: (data as Response).headers,
         };
 
         waitUntil(
-          complete.then(async (shouldCache) => {
-            if (!shouldCache || cancelled) return;
+          pumpDone.then(async () => {
+            if (!pumpSuccess) return;
             const buffer = concatUint8Arrays(chunks, totalLength);
             await cache.update(cacheKey, new Response(buffer, responseInit));
           })
         );
 
-        data = new Response(clientBody, responseInit) as Data;
+        data = new Response(readable, responseInit) as Data;
       } else {
         data = await cache.update<Data>(cacheKey, data as Data);
       }
