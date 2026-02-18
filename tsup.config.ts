@@ -3,7 +3,7 @@ import { join } from 'path';
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/lib/hono.ts'],
+  entry: ['src/index.ts', 'src/lib/hono.ts', 'src/lib/durable-object-deduper.ts'],
   format: ['cjs', 'esm'],
   outDir: 'dist/src',
   dts: {

@@ -1,3 +1,5 @@
+import { waitUntil } from 'cloudflare:workers';
+
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
 const HEADER = 'cf-workers-query';
@@ -16,11 +18,14 @@ const getVoidCache = () => {
   console.warn('No caches API available');
 
   return {
-    put: async (key: URL | string, value: unknown) => {
+    put: async (_key: URL | string, _value: unknown) => {
       return;
     },
-    match: async (key: URL | string): Promise<Response | undefined> => {
+    match: async (_key: URL | string): Promise<Response | undefined> => {
       return undefined;
+    },
+    delete: async (_key: URL | string): Promise<boolean> => {
+      return false;
     },
   };
 };
@@ -97,29 +102,39 @@ export class CacheApiAdaptor {
     key: QueryKey,
     value: Data | Response,
     options?: { maxAge?: number }
-  ) {
-    const cache = await getCache(this.cacheName);
-
+  ): Promise<Data> {
     const maxAge = options?.maxAge ?? this.maxAge;
 
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
 
     if (value instanceof Response) {
-      const response = new Response(value.body, value);
+      const body = await value.arrayBuffer();
+      const init = { status: value.status, statusText: value.statusText };
 
-      const isAlreadyCached = response.headers.get('cf-cache-status') === 'HIT';
-
+      const isAlreadyCached = value.headers.get('cf-cache-status') === 'HIT';
       const currentCacheControl = value.headers.get('cache-control');
 
-      response.headers.set('cache-control', `max-age=${maxAge}`);
-      response.headers.set(HEADER_DATE, Date.now().toString());
+      const cacheHeaders = new Headers(value.headers);
+      cacheHeaders.set('cache-control', `max-age=${maxAge}`);
+      cacheHeaders.set(HEADER_DATE, Date.now().toString());
 
       if (!isAlreadyCached && currentCacheControl) {
-        response.headers.set(HEADER_CURRENT_CACHE_CONTROL, currentCacheControl);
+        cacheHeaders.set(HEADER_CURRENT_CACHE_CONTROL, currentCacheControl);
       }
 
-      await cache.put(cacheKey, response);
-      return;
+      waitUntil(
+        getCache(this.cacheName).then((cache) =>
+          cache.put(
+            cacheKey,
+            new Response(body, { ...init, headers: cacheHeaders })
+          )
+        )
+      );
+
+      return new Response(body, {
+        ...init,
+        headers: new Headers(value.headers),
+      }) as Data;
     }
 
     const headers = new Headers();
@@ -128,25 +143,19 @@ export class CacheApiAdaptor {
     headers.set(HEADER, 'true');
     headers.set(HEADER_DATE, Date.now().toString());
 
-    const response = new Response(JSON.stringify(value), {
-      headers,
-    });
+    waitUntil(
+      getCache(this.cacheName).then((cache) =>
+        cache.put(cacheKey, new Response(JSON.stringify(value), { headers }))
+      )
+    );
 
-    await cache.put(cacheKey, response);
+    return value as Data;
   }
 
   public async delete(key: QueryKey) {
     const cache = await getCache(this.cacheName);
-
-    const response = new Response(null, {
-      headers: new Headers({
-        'cache-control': `max-age=0`,
-      }),
-    });
-
     const cacheKey = key instanceof URL ? key : this.buildCacheKey(key);
-
-    await cache.put(cacheKey, response);
+    await cache.delete(cacheKey);
   }
 
   /**
@@ -161,25 +170,29 @@ export class CacheApiAdaptor {
 }
 
 // Copied from: https://github.com/jonschlinkert/is-plain-object
-export function isPlainObject(o: any): o is Object {
+export function isPlainObject(o: unknown): o is Record<string, unknown> {
   if (!hasObjectPrototype(o)) {
     return false;
   }
 
+  const obj = o as Record<string, unknown>;
+
   // If has no constructor
-  const ctor = o.constructor;
+  const ctor = obj.constructor;
   if (ctor === undefined) {
     return true;
   }
 
   // If has modified prototype
-  const prot = ctor.prototype;
+  const prot = (ctor as { prototype?: unknown }).prototype;
   if (!hasObjectPrototype(prot)) {
     return false;
   }
 
   // If constructor does not have an Object-specific method
-  if (!prot.hasOwnProperty('isPrototypeOf')) {
+  if (
+    !Object.prototype.hasOwnProperty.call(prot, 'isPrototypeOf')
+  ) {
     return false;
   }
 
@@ -192,7 +205,7 @@ export function isPlainObject(o: any): o is Object {
   return true;
 }
 
-function hasObjectPrototype(o: any): boolean {
+function hasObjectPrototype(o: unknown): boolean {
   return Object.prototype.toString.call(o) === '[object Object]';
 }
 
@@ -208,7 +221,7 @@ export function hashKey(queryKey: ReadonlyArray<unknown>): string {
           .reduce((result, key) => {
             result[key] = val[key];
             return result;
-          }, {} as any)
+          }, {} as Record<string, unknown>)
       : val
   );
 }

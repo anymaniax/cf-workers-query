@@ -24,8 +24,15 @@
     "test": "nx test"
   },
   "dependencies": {
-    "nanoid": "^5.0.7",
     "tslib": "^2.3.0"
+  },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250807.0",
@@ -80,12 +87,25 @@
         "types": "./src/lib/hono.d.cts",
         "default": "./src/lib/hono.cjs"
       }
+    },
+    "./durable-object": {
+      "import": {
+        "types": "./src/lib/durable-object-deduper.d.ts",
+        "default": "./src/lib/durable-object-deduper.js"
+      },
+      "require": {
+        "types": "./src/lib/durable-object-deduper.d.cts",
+        "default": "./src/lib/durable-object-deduper.cjs"
+      }
     }
   },
   "typesVersions": {
     "*": {
       "hono": [
         "./src/lib/hono.d.ts"
+      ],
+      "durable-object": [
+        "./src/lib/durable-object-deduper.d.ts"
       ]
     }
   }

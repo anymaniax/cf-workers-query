@@ -39,5 +39,5 @@ export const cache =
       throw new HTTPException(500);
     }
 
-    return new Response(response.body, response);
+    return response;
   };
