@@ -81,7 +81,9 @@ export const createQuery = async <Data = unknown, TError = unknown>({
               // Best-effort dedup
             }
             if (!alreadyRefreshing) {
-              dedupeManager.markProcessing(cacheKey).catch(() => {});
+              waitUntil(
+                dedupeManager.markProcessing(cacheKey).catch(() => {})
+              );
               waitUntil(
                 (async () => {
                   try {

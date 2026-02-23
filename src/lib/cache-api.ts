@@ -1,5 +1,3 @@
-import { waitUntil } from 'cloudflare:workers';
-
 export const CACHE_URL = 'INTERNAL_CF_WORKERS_QUERY_CACHE_HOSTNAME.local';
 
 const HEADER = 'cf-workers-query';
@@ -122,13 +120,10 @@ export class CacheApiAdaptor {
         cacheHeaders.set(HEADER_CURRENT_CACHE_CONTROL, currentCacheControl);
       }
 
-      waitUntil(
-        getCache(this.cacheName).then((cache) =>
-          cache.put(
-            cacheKey,
-            new Response(body, { ...init, headers: cacheHeaders })
-          )
-        )
+      const openCache = await getCache(this.cacheName);
+      await openCache.put(
+        cacheKey,
+        new Response(body, { ...init, headers: cacheHeaders })
       );
 
       return new Response(body, {
@@ -143,10 +138,10 @@ export class CacheApiAdaptor {
     headers.set(HEADER, 'true');
     headers.set(HEADER_DATE, Date.now().toString());
 
-    waitUntil(
-      getCache(this.cacheName).then((cache) =>
-        cache.put(cacheKey, new Response(JSON.stringify(value), { headers }))
-      )
+    const openCache = await getCache(this.cacheName);
+    await openCache.put(
+      cacheKey,
+      new Response(JSON.stringify(value), { headers })
     );
 
     return value as Data;
