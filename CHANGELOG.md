@@ -1,3 +1,14 @@
+## 0.11.4 (2026-02-23)
+
+
+### 🩹 Fixes
+
+- **cache-api:** remove waitUntil add it only top level ([63d4843](https://github.com/anymaniax/cf-workers-query/commit/63d4843))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.3 (2026-02-18)
 
 
