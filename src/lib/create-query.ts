@@ -82,15 +82,15 @@ export const createQuery = async <Data = unknown, TError = unknown>({
             }
             if (!alreadyRefreshing) {
               waitUntil(
-                dedupeManager.markProcessing(cacheKey).catch(() => {})
-              );
-              waitUntil(
                 (async () => {
+                  await dedupeManager.markProcessing(cacheKey).catch(() => {});
                   try {
                     const newData = await queryFn();
                     await cache.update(cacheKey, newData);
                   } finally {
-                    await dedupeManager.clearProcessing(cacheKey).catch(() => {});
+                    await dedupeManager
+                      .clearProcessing(cacheKey)
+                      .catch(() => {});
                   }
                 })()
               );
@@ -144,12 +144,10 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       throwOnError,
     });
 
-    // Clear marker in background - never block the response
-    waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
-
     let data: Data | null = fetchedData;
 
     if (error) {
+      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
       return {
         data: null,
         error,
@@ -205,16 +203,27 @@ export const createQuery = async <Data = unknown, TError = unknown>({
 
         waitUntil(
           pumpDone.then(async () => {
-            if (!pumpSuccess) return;
-            const buffer = concatUint8Arrays(chunks, totalLength);
-            await cache.update(cacheKey, new Response(buffer, responseInit));
+            try {
+              if (pumpSuccess) {
+                const buffer = concatUint8Arrays(chunks, totalLength);
+                await cache.update(
+                  cacheKey,
+                  new Response(buffer, responseInit)
+                );
+              }
+            } finally {
+              await dedupeManager.clearProcessing(cacheKey).catch(() => {});
+            }
           })
         );
 
         data = new Response(readable, responseInit) as Data;
       } else {
         data = await cache.update<Data>(cacheKey, data as Data);
+        waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
       }
+    } else {
+      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
     }
 
     return { data, error: null, invalidate, lastModified: null };
