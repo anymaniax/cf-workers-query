@@ -1,3 +1,14 @@
+## 0.11.5 (2026-02-24)
+
+
+### 🩹 Fixes
+
+- **create-query:** improve waitUntil gesture ([13a4e63](https://github.com/anymaniax/cf-workers-query/commit/13a4e63))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.4 (2026-02-23)
 
 
