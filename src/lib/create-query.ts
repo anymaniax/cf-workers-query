@@ -170,15 +170,21 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       // Best-effort, proceed without marker
     }
 
-    const { data: fetchedData, error } = await handleQueryFnWithRetry<
-      Data,
-      TError
-    >({
-      queryFn,
-      retry,
-      retryDelay,
-      throwOnError,
-    });
+    let fetched: { data: Data | null; error: TError | null };
+    try {
+      fetched = await handleQueryFnWithRetry<Data, TError>({
+        queryFn,
+        retry,
+        retryDelay,
+        throwOnError,
+      });
+    } catch (e) {
+      // throwOnError path — clear the dedupe marker before rethrowing so
+      // subsequent requests for this key don't wait on a stale marker.
+      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+      throw e;
+    }
+    const { data: fetchedData, error } = fetched;
 
     let data: Data | null = fetchedData;
 
@@ -219,8 +225,15 @@ export const createQuery = async <Data = unknown, TError = unknown>({
                   totalLength += value.byteLength;
                   controller.enqueue(value);
                 }
-              } catch {
+              } catch (pumpError) {
                 reader.releaseLock();
+                try {
+                  // Propagate upstream failures so the client response aborts
+                  // instead of stalling open forever.
+                  controller.error(pumpError);
+                } catch {
+                  // Controller already closed/errored
+                }
               }
               pumpResolve();
             })();
