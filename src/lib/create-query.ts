@@ -1,6 +1,42 @@
-import { waitUntil } from 'cloudflare:workers';
 import { CacheApiAdaptor, QueryKey } from './cache-api';
 import { DedupeManager } from './dedupe-manager';
+
+/**
+ * `waitUntil` (from the `cloudflare:workers` builtin) keeps background work —
+ * SWR revalidation and dedupe-marker cleanup — alive after the response is sent.
+ * That builtin only exists in the Worker runtime, so a *static* top-level
+ * `import { waitUntil } from 'cloudflare:workers'` forces every consumer bundle
+ * that transitively imports `createQuery` — including browser/client bundles — to
+ * resolve the specifier, which fails outside a Worker (e.g. Vite/Rolldown:
+ * "failed to resolve import 'cloudflare:workers'").
+ *
+ * We resolve it lazily through a dynamic import with a non-statically-analysable
+ * specifier, pre-warmed at module load: bundlers leave it as a runtime import, so
+ * non-Worker bundles build cleanly. The Worker resolves the real,
+ * request-context-aware implementation; off-Worker the import rejects and we fall
+ * back to a no-op (background revalidation simply does not run there).
+ */
+type WaitUntil = (promise: Promise<unknown>) => void;
+
+let waitUntilImpl: WaitUntil = () => {};
+
+// Built from parts so neither the library build (tsup/esbuild) nor a consumer
+// bundler can fold this back into a static `cloudflare:workers` import.
+const cloudflareWorkersModule = ['cloudflare', 'workers'].join(':');
+
+void import(/* @vite-ignore */ cloudflareWorkersModule)
+  .then((mod: { waitUntil?: WaitUntil }) => {
+    if (typeof mod?.waitUntil === 'function') {
+      waitUntilImpl = mod.waitUntil;
+    }
+  })
+  .catch(() => {
+    // Off-Worker (browser/Node): keep the no-op.
+  });
+
+const waitUntil: WaitUntil = (promise) => {
+  waitUntilImpl(promise);
+};
 
 export type RetryDelay<TError = unknown> =
   | number
