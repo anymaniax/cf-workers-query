@@ -1,3 +1,15 @@
+## 0.11.7 (2026-06-09)
+
+
+### 🩹 Fixes
+
+- **create-query:** better handling some edge cases ([a607804](https://github.com/anymaniax/cf-workers-query/commit/a607804))
+- **workers:** lazy import ([3d03674](https://github.com/anymaniax/cf-workers-query/commit/3d03674))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.6 (2026-06-09)
 
 This was a version bump only, there were no code changes.
