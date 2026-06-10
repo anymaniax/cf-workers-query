@@ -13,8 +13,11 @@ import { DedupeManager } from './dedupe-manager';
  * We resolve it lazily through a dynamic import with a non-statically-analysable
  * specifier, pre-warmed at module load: bundlers leave it as a runtime import, so
  * non-Worker bundles build cleanly. The Worker resolves the real,
- * request-context-aware implementation; off-Worker the import rejects and we fall
- * back to a no-op (background revalidation simply does not run there).
+ * request-context-aware implementation; off-Worker we never attempt the import
+ * and keep a no-op (background revalidation simply does not run there) — merely
+ * attempting it in a browser makes it fetch the literal URL `cloudflare:workers`
+ * and log a CORS error ("CORS request not http") even when the rejection is
+ * caught.
  */
 type WaitUntil = (promise: Promise<unknown>) => void;
 
@@ -24,15 +27,19 @@ let waitUntilImpl: WaitUntil = () => {};
 // bundler can fold this back into a static `cloudflare:workers` import.
 const cloudflareWorkersModule = ['cloudflare', 'workers'].join(':');
 
-void import(/* @vite-ignore */ cloudflareWorkersModule)
-  .then((mod: { waitUntil?: WaitUntil }) => {
-    if (typeof mod?.waitUntil === 'function') {
-      waitUntilImpl = mod.waitUntil;
-    }
-  })
-  .catch(() => {
-    // Off-Worker (browser/Node): keep the no-op.
-  });
+// `WebSocketPair` only exists in workerd (independent of compatibility date),
+// so browsers and Node skip the probe entirely.
+if ('WebSocketPair' in globalThis) {
+  void import(/* @vite-ignore */ cloudflareWorkersModule)
+    .then((mod: { waitUntil?: WaitUntil }) => {
+      if (typeof mod?.waitUntil === 'function') {
+        waitUntilImpl = mod.waitUntil;
+      }
+    })
+    .catch(() => {
+      // Runtimes without the `cloudflare:workers` builtin: keep the no-op.
+    });
+}
 
 const waitUntil: WaitUntil = (promise) => {
   waitUntilImpl(promise);

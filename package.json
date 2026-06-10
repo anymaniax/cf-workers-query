@@ -19,6 +19,7 @@
     "cloudflare",
     "workers"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "nx build",
     "test": "nx test"
