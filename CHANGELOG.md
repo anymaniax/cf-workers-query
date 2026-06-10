@@ -1,3 +1,14 @@
+## 0.11.8 (2026-06-10)
+
+
+### 🩹 Fixes
+
+- **create-query:** add guard import ([8deecaf](https://github.com/anymaniax/cf-workers-query/commit/8deecaf))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.7 (2026-06-09)
 
 
