@@ -12,6 +12,30 @@ type CachePayload<Data = unknown> = {
 
 export type QueryKey = ReadonlyArray<unknown> | URL;
 
+/**
+ * Turns a query key into the string that identifies its cache entry. Defaults to
+ * `hashKey`, the same stable JSON hash React Query uses.
+ *
+ * The returned string is interpolated into a URL (see `buildCacheKey`), so a custom
+ * implementation MUST return a URL-safe string. `hashKey`'s raw JSON survives only
+ * because `new Request()` percent-encodes it on the way in — do not rely on that
+ * for your own output.
+ *
+ * Prefer `baseKey` for the common case of scoping a keyspace; reach for this only
+ * when a prefix cannot express what you need.
+ */
+export type QueryKeyHashFn = (queryKey: ReadonlyArray<unknown>) => string;
+
+/**
+ * Prepended to every query key before hashing. See `baseKey` on `defineQueryClient`
+ * for why this exists at all: the Cache API is a ZONE store, so entries are shared
+ * by every Worker and every deployment on the zone.
+ *
+ * Restricted to primitives on purpose — a `baseKey` is meant to be readable in a log,
+ * and an object's hash stability would depend on `hashKey`'s key sorting.
+ */
+export type BaseKey = ReadonlyArray<string | number>;
+
 const getVoidCache = () => {
   console.warn('No caches API available');
 
@@ -39,10 +63,28 @@ const getCache = async (cacheName: string) => {
 export class CacheApiAdaptor {
   private cacheName: string;
   private maxAge: number;
+  private baseKey: BaseKey;
+  private queryKeyHashFn: QueryKeyHashFn;
 
-  constructor(ctx: { cacheName?: string; maxAge?: number } = {}) {
+  constructor(
+    ctx: {
+      cacheName?: string;
+      maxAge?: number;
+      baseKey?: BaseKey;
+      queryKeyHashFn?: QueryKeyHashFn;
+    } = {}
+  ) {
     this.cacheName = ctx.cacheName ?? 'cf-workers-query-cache';
     this.maxAge = ctx.maxAge ?? 60;
+    this.baseKey = ctx.baseKey ?? [];
+    this.queryKeyHashFn = ctx.queryKeyHashFn ?? hashKey;
+
+    // `buildCacheKey` reads instance state as of 0.12, where it used to close over nothing.
+    // A detached reference — `const f = cache.buildCacheKey`, `keys.map(cache.buildCacheKey)`,
+    // destructuring off the instance — used to work and would now throw on `this`. Bind it so
+    // it keeps working, without turning it into an own arrow property (that would stop
+    // subclasses overriding it on the prototype).
+    this.buildCacheKey = this.buildCacheKey.bind(this);
   }
 
   public async retrieve<Data = unknown>(
@@ -156,11 +198,22 @@ export class CacheApiAdaptor {
   /**
    * Builds the full cache key for the suspense cache.
    *
+   * The single choke point for cache identity: `retrieve`, `update`, `delete` and
+   * `DedupeManager`'s markers all route through here, so `baseKey` and
+   * `queryKeyHashFn` scope entries, invalidations and dedupe markers together —
+   * there is no second place a key can be derived, and so no way for a read and its
+   * invalidation to disagree.
+   *
+   * With no `baseKey` and no custom hash this is byte-identical to what every
+   * version before 0.12 produced, so upgrading never orphans a warm cache.
+   *
    * @param key Key for the item in the suspense cache.
    * @returns The fully-formed cache key for the suspense cache.
    */
   public buildCacheKey(key: ReadonlyArray<unknown>) {
-    return `https://${CACHE_URL}/entry?key=${hashKey(key)}`;
+    const scoped = this.baseKey.length ? [...this.baseKey, ...key] : key;
+
+    return `https://${CACHE_URL}/entry?key=${this.queryKeyHashFn(scoped)}`;
   }
 }
 

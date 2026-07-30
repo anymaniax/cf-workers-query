@@ -1,53 +1,41 @@
-import { CacheApiAdaptor, QueryKey } from './cache-api';
+import {
+  BaseKey,
+  CacheApiAdaptor,
+  QueryKey,
+  QueryKeyHashFn,
+} from './cache-api';
 import { DedupeManager } from './dedupe-manager';
-
-/**
- * `waitUntil` (from the `cloudflare:workers` builtin) keeps background work —
- * SWR revalidation and dedupe-marker cleanup — alive after the response is sent.
- * That builtin only exists in the Worker runtime, so a *static* top-level
- * `import { waitUntil } from 'cloudflare:workers'` forces every consumer bundle
- * that transitively imports `createQuery` — including browser/client bundles — to
- * resolve the specifier, which fails outside a Worker (e.g. Vite/Rolldown:
- * "failed to resolve import 'cloudflare:workers'").
- *
- * We resolve it lazily through a dynamic import with a non-statically-analysable
- * specifier, pre-warmed at module load: bundlers leave it as a runtime import, so
- * non-Worker bundles build cleanly. The Worker resolves the real,
- * request-context-aware implementation; off-Worker we never attempt the import
- * and keep a no-op (background revalidation simply does not run there) — merely
- * attempting it in a browser makes it fetch the literal URL `cloudflare:workers`
- * and log a CORS error ("CORS request not http") even when the rejection is
- * caught.
- */
-type WaitUntil = (promise: Promise<unknown>) => void;
-
-let waitUntilImpl: WaitUntil = () => {};
-
-// Built from parts so neither the library build (tsup/esbuild) nor a consumer
-// bundler can fold this back into a static `cloudflare:workers` import.
-const cloudflareWorkersModule = ['cloudflare', 'workers'].join(':');
-
-// `WebSocketPair` only exists in workerd (independent of compatibility date),
-// so browsers and Node skip the probe entirely.
-if ('WebSocketPair' in globalThis) {
-  void import(/* @vite-ignore */ cloudflareWorkersModule)
-    .then((mod: { waitUntil?: WaitUntil }) => {
-      if (typeof mod?.waitUntil === 'function') {
-        waitUntilImpl = mod.waitUntil;
-      }
-    })
-    .catch(() => {
-      // Runtimes without the `cloudflare:workers` builtin: keep the no-op.
-    });
-}
-
-const waitUntil: WaitUntil = (promise) => {
-  waitUntilImpl(promise);
-};
+import { waitUntil } from './wait-until';
 
 export type RetryDelay<TError = unknown> =
   | number
   | ((failureCount: number, error: TError) => number);
+
+/**
+ * Where the returned data came from. Cheap to log, and the difference between a
+ * five-minute debugging session and a three-hour one: without it a stale value, a
+ * fresh value and a value from someone else's cache entry all look identical.
+ *
+ * - `hit`      — served from cache, still fresh
+ * - `stale`    — served from cache past `staleTime`; a refresh is running in the background
+ * - `miss`     — `queryFn` ran for this request
+ * - `uncached` — caching was skipped entirely (no `queryKey`, no `gcTime`, or `enabled: false`)
+ */
+export type QuerySource = 'hit' | 'stale' | 'miss' | 'uncached';
+
+export type QueryResult<Data = unknown, TError = unknown> = {
+  data: Data | null;
+  error: TError | null;
+  invalidate: () => Promise<void> | void;
+  lastModified: number | null;
+  /**
+   * ALWAYS populated at runtime. Optional in the type only so that code written against a
+   * pre-0.12 result — a test mock, a wrapper declaring this type as its return type — keeps
+   * compiling: adding a required member to a type consumers may CONSTRUCT is a breaking
+   * change, however additive it looks from the reading side.
+   */
+  source?: QuerySource;
+};
 
 export type CreateQuery<Data = unknown, TError = unknown> = {
   queryKey?: QueryKey | null;
@@ -58,12 +46,39 @@ export type CreateQuery<Data = unknown, TError = unknown> = {
   retry?: number | ((failureCount: number, error: TError) => boolean);
   retryDelay?: RetryDelay<TError>;
   cacheName?: string;
+  /**
+   * Prepended to `queryKey` before hashing. The Cache API is a ZONE store, so every
+   * Worker and every deployment sharing the zone reads the same entries — see
+   * `defineQueryClient`, which is the intended way to set this once per deployment.
+   */
+  baseKey?: BaseKey;
+  /** Escape hatch under `baseKey`. Must return a URL-safe string. */
+  queryKeyHashFn?: QueryKeyHashFn;
   throwOnError?: boolean;
+  /**
+   * Controls CACHING, not whether the query runs.
+   *
+   * NOTE this differs from React Query, where `enabled: false` means the query does not
+   * execute. Here `queryFn` ALWAYS runs — `false` only bypasses the cache entirely, and a
+   * predicate decides whether a given value is worth storing (and whether a stored one is
+   * worth returning). There is no reactive observer to defer to, so "don't run" is
+   * something the caller expresses with an `if`, not with an option.
+   */
   enabled?: boolean | ((data: Data) => boolean);
   revalidateMode?: 'default' | 'probabilistic';
+  /**
+   * Called when a background revalidation fails. The stale entry is kept and the next
+   * request retries, so this is never fatal — but without a hook the failure is
+   * completely invisible, and an entry that keeps failing to refresh stays stale until
+   * `gcTime`, which can be hours.
+   *
+   * Must not throw; a throw here is swallowed.
+   */
+  onRevalidateError?: (
+    error: unknown,
+    context: { queryKey: QueryKey }
+  ) => void;
 };
-
-const dedupeManager = new DedupeManager();
 
 export const createQuery = async <Data = unknown, TError = unknown>({
   queryKey,
@@ -74,15 +89,13 @@ export const createQuery = async <Data = unknown, TError = unknown>({
   retry,
   retryDelay,
   cacheName,
+  baseKey,
+  queryKeyHashFn,
   throwOnError,
   enabled = true,
   revalidateMode = 'default',
-}: CreateQuery<Data, TError>): Promise<{
-  data: Data | null;
-  error: TError | null;
-  invalidate: () => Promise<void> | void;
-  lastModified: number | null;
-}> => {
+  onRevalidateError,
+}: CreateQuery<Data, TError>): Promise<QueryResult<Data, TError>> => {
   try {
     if (!queryKey || !enabled || !gcTime) {
       const { data, error } = await handleQueryFnWithRetry<Data, TError>({
@@ -92,10 +105,25 @@ export const createQuery = async <Data = unknown, TError = unknown>({
         throwOnError,
       });
 
-      return { data, error, invalidate: () => undefined, lastModified: null };
+      return {
+        data,
+        error,
+        invalidate: () => undefined,
+        lastModified: null,
+        source: 'uncached',
+      };
     }
 
-    const cache = new CacheApiAdaptor({ maxAge: gcTime, cacheName });
+    const cache = new CacheApiAdaptor({
+      maxAge: gcTime,
+      cacheName,
+      baseKey,
+      queryKeyHashFn,
+    });
+
+    // Scoped exactly like the entries it guards: an unscoped marker lets one
+    // deployment's in-flight revalidation suppress another deployment's.
+    const dedupeManager = new DedupeManager({ baseKey, queryKeyHashFn });
 
     const cacheKey = queryKey;
     const invalidate = () => cache.delete(cacheKey);
@@ -130,6 +158,26 @@ export const createQuery = async <Data = unknown, TError = unknown>({
                   try {
                     const newData = await queryFn();
                     await cache.update(cacheKey, newData);
+                  } catch (revalidateError) {
+                    // Background revalidation failed (queryFn threw, or its
+                    // Response body was already consumed by the foreground
+                    // response). The foreground already served the stale entry,
+                    // so swallow it and keep the stale value — the next request
+                    // retries. Never let this reject into `waitUntil`: the
+                    // runtime logs an unhandled `waitUntil` rejection as an
+                    // exception even though nothing user-facing went wrong.
+                    //
+                    // Swallowed is not the same as unreportable, though: hand it
+                    // to the caller's hook so a key that never manages to refresh
+                    // is observable instead of silently stale until `gcTime`.
+                    try {
+                      onRevalidateError?.(revalidateError, {
+                        queryKey: cacheKey,
+                      });
+                    } catch {
+                      // A throwing hook must not resurrect the rejection we just
+                      // went out of our way to contain.
+                    }
                   } finally {
                     await dedupeManager
                       .clearProcessing(cacheKey)
@@ -147,6 +195,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
             error: null,
             invalidate,
             lastModified: cachedData.lastModified,
+            source: isStale ? 'stale' : 'hit',
           };
         }
       }
@@ -164,6 +213,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
             error: null,
             invalidate,
             lastModified: freshCache.lastModified,
+            source: 'hit',
           };
         }
       }
@@ -202,6 +252,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
         error,
         invalidate: () => undefined,
         lastModified: null,
+        source: 'miss',
       };
     }
 
@@ -282,7 +333,12 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
     }
 
-    return { data, error: null, invalidate, lastModified: null };
+    // `lastModified` stays NULL here even though we know the timestamp we just wrote.
+    // In the wild it is read as a cache-hit predicate — `lastModified !== null` meaning
+    // "there was an entry" — so putting a number on the fetch path silently inverts every
+    // such check. Use `source` for that; the two would be redundant anyway, and only one
+    // of them is backwards compatible.
+    return { data, error: null, invalidate, lastModified: null, source: 'miss' };
   } catch (e) {
     if (throwOnError) {
       throw e;
@@ -293,6 +349,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       error: e as TError,
       invalidate: () => undefined,
       lastModified: null,
+      source: 'miss',
     };
   }
 };
