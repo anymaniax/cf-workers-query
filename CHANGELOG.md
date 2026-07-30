@@ -1,3 +1,14 @@
+## 0.12.0 (2026-07-30)
+
+
+### 🚀 Features
+
+- **api:** createQueryClient first setup ([837cbea](https://github.com/anymaniax/cf-workers-query/commit/837cbea))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.11.8 (2026-06-10)
 
 
