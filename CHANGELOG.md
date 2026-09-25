@@ -1,3 +1,14 @@
+## 0.12.1 (2026-09-25)
+
+
+### 🩹 Fixes
+
+- **create-query:** optimize revalidation ([2f32e9c](https://github.com/anymaniax/cf-workers-query/commit/2f32e9c))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.12.0 (2026-07-30)
 
 
