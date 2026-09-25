@@ -145,47 +145,44 @@ export const createQuery = async <Data = unknown, TError = unknown>({
               : true;
 
           if (shouldRevalidate) {
-            let alreadyRefreshing = false;
-            try {
-              alreadyRefreshing = await dedupeManager.isProcessing(cacheKey);
-            } catch {
-              // Best-effort dedup
-            }
-            if (!alreadyRefreshing) {
-              waitUntil(
-                (async () => {
-                  await dedupeManager.markProcessing(cacheKey).catch(() => {});
-                  try {
-                    const newData = await queryFn();
-                    await cache.update(cacheKey, newData);
-                  } catch (revalidateError) {
-                    // Background revalidation failed (queryFn threw, or its
-                    // Response body was already consumed by the foreground
-                    // response). The foreground already served the stale entry,
-                    // so swallow it and keep the stale value — the next request
-                    // retries. Never let this reject into `waitUntil`: the
-                    // runtime logs an unhandled `waitUntil` rejection as an
-                    // exception even though nothing user-facing went wrong.
-                    //
-                    // Swallowed is not the same as unreportable, though: hand it
-                    // to the caller's hook so a key that never manages to refresh
-                    // is observable instead of silently stale until `gcTime`.
-                    try {
-                      onRevalidateError?.(revalidateError, {
-                        queryKey: cacheKey,
-                      });
-                    } catch {
-                      // A throwing hook must not resurrect the rejection we just
-                      // went out of our way to contain.
-                    }
-                  } finally {
-                    await dedupeManager
-                      .clearProcessing(cacheKey)
-                      .catch(() => {});
+            waitUntil(
+              (async () => {
+                try {
+                  if (await dedupeManager.isProcessing(cacheKey)) {
+                    return;
                   }
-                })()
-              );
-            }
+                } catch {
+                  // Best-effort dedup
+                }
+                await dedupeManager.markProcessing(cacheKey).catch(() => {});
+                try {
+                  const newData = await queryFn();
+                  await cache.update(cacheKey, newData);
+                } catch (revalidateError) {
+                  // Background revalidation failed (queryFn threw, or its
+                  // Response body was already consumed by the foreground
+                  // response). The foreground already served the stale entry,
+                  // so swallow it and keep the stale value — the next request
+                  // retries. Never let this reject into `waitUntil`: the
+                  // runtime logs an unhandled `waitUntil` rejection as an
+                  // exception even though nothing user-facing went wrong.
+                  //
+                  // Swallowed is not the same as unreportable, though: hand it
+                  // to the caller's hook so a key that never manages to refresh
+                  // is observable instead of silently stale until `gcTime`.
+                  try {
+                    onRevalidateError?.(revalidateError, {
+                      queryKey: cacheKey,
+                    });
+                  } catch {
+                    // A throwing hook must not resurrect the rejection we just
+                    // went out of our way to contain.
+                  }
+                } finally {
+                  await dedupeManager.clearProcessing(cacheKey).catch(() => {});
+                }
+              })()
+            );
           }
         }
 
@@ -221,11 +218,13 @@ export const createQuery = async <Data = unknown, TError = unknown>({
       // Cache API issue - proceed with fetch
     }
 
-    try {
-      await dedupeManager.markProcessing(cacheKey);
-    } catch {
-      // Best-effort, proceed without marker
-    }
+    const marking = dedupeManager.markProcessing(cacheKey).catch(() => {});
+    // Cache API operations are not ordered unless awaited: a delete issued before the
+    // put lands can be overtaken by it, leaving the marker in place for its full maxAge.
+    const clearMarker = () =>
+      marking
+        .then(() => dedupeManager.clearProcessing(cacheKey))
+        .catch(() => {});
 
     let fetched: { data: Data | null; error: TError | null };
     try {
@@ -238,7 +237,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
     } catch (e) {
       // throwOnError path — clear the dedupe marker before rethrowing so
       // subsequent requests for this key don't wait on a stale marker.
-      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+      waitUntil(clearMarker());
       throw e;
     }
     const { data: fetchedData, error } = fetched;
@@ -246,7 +245,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
     let data: Data | null = fetchedData;
 
     if (error) {
-      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+      waitUntil(clearMarker());
       return {
         data: null,
         error,
@@ -319,7 +318,7 @@ export const createQuery = async <Data = unknown, TError = unknown>({
                 );
               }
             } finally {
-              await dedupeManager.clearProcessing(cacheKey).catch(() => {});
+              await clearMarker();
             }
           })
         );
@@ -327,10 +326,10 @@ export const createQuery = async <Data = unknown, TError = unknown>({
         data = new Response(readable, responseInit) as Data;
       } else {
         data = await cache.update<Data>(cacheKey, data as Data);
-        waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+        waitUntil(clearMarker());
       }
     } else {
-      waitUntil(dedupeManager.clearProcessing(cacheKey).catch(() => {}));
+      waitUntil(clearMarker());
     }
 
     // `lastModified` stays NULL here even though we know the timestamp we just wrote.
