@@ -16,10 +16,8 @@ export type QueryKey = ReadonlyArray<unknown> | URL;
  * Turns a query key into the string that identifies its cache entry. Defaults to
  * `hashKey`, the same stable JSON hash React Query uses.
  *
- * The returned string is interpolated into a URL (see `buildCacheKey`), so a custom
- * implementation MUST return a URL-safe string. `hashKey`'s raw JSON survives only
- * because `new Request()` percent-encodes it on the way in — do not rely on that
- * for your own output.
+ * `buildCacheKey` percent-encodes the returned string into its URL, so it may hold any
+ * character.
  *
  * Prefer `baseKey` for the common case of scoping a keyspace; reach for this only
  * when a prefix cannot express what you need.
@@ -204,8 +202,8 @@ export class CacheApiAdaptor {
    * there is no second place a key can be derived, and so no way for a read and its
    * invalidation to disagree.
    *
-   * With no `baseKey` and no custom hash this is byte-identical to what every
-   * version before 0.12 produced, so upgrading never orphans a warm cache.
+   * The hash is percent-encoded: the Cache API parses the key as a URL, which decodes
+   * `%XX` and drops everything after `#`, so a raw value can spell another key's URL.
    *
    * @param key Key for the item in the suspense cache.
    * @returns The fully-formed cache key for the suspense cache.
@@ -213,7 +211,7 @@ export class CacheApiAdaptor {
   public buildCacheKey(key: ReadonlyArray<unknown>) {
     const scoped = this.baseKey.length ? [...this.baseKey, ...key] : key;
 
-    return `https://${CACHE_URL}/entry?key=${this.queryKeyHashFn(scoped)}`;
+    return `https://${CACHE_URL}/entry?key=${encodeURIComponent(this.queryKeyHashFn(scoped))}`;
   }
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CacheApiAdaptor } from './cache-api';
+import { CacheApiAdaptor, hashKey } from './cache-api';
 import { createQuery } from './create-query';
 import { DedupeManager } from './dedupe-manager';
 import { invalidateQuery } from './invalidate-query';
@@ -459,5 +459,18 @@ describe('createQuery semantics', () => {
     const cached = await readEntry(queryKey);
     expect(await (cached?.data as Response).text()).toBe('hello');
     expect(await isMarked(queryKey)).toBe(false);
+  });
+});
+
+describe('CacheApiAdaptor.buildCacheKey', () => {
+  it('keeps a value spelling another key apart once the Cache API parses the URL', () => {
+    const cache = new CacheApiAdaptor();
+    const genuine = ['lessons', ['T'], null, 25];
+    const forged = ['lessons', ['T%22],null,25]#'], null, 25];
+
+    expect(new URL(cache.buildCacheKey(forged)).href).not.toBe(
+      new URL(cache.buildCacheKey(genuine)).href
+    );
+    expect(new URL(cache.buildCacheKey(forged)).searchParams.get('key')).toBe(hashKey(forged));
   });
 });

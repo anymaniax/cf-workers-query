@@ -52,7 +52,7 @@ export type CreateQuery<Data = unknown, TError = unknown> = {
    * `defineQueryClient`, which is the intended way to set this once per deployment.
    */
   baseKey?: BaseKey;
-  /** Escape hatch under `baseKey`. Must return a URL-safe string. */
+  /** Escape hatch under `baseKey`. */
   queryKeyHashFn?: QueryKeyHashFn;
   throwOnError?: boolean;
   /**

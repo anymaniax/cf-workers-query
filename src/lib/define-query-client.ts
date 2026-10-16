@@ -81,9 +81,6 @@ export type QueryClient = {
  * + const { createQuery, invalidateQuery } = defineQueryClient({ baseKey: [...] });
  * ```
  *
- * With no `baseKey` and no `queryKeyHashFn`, keys are byte-identical to what every version
- * before 0.12 produced — upgrading never orphans a warm cache.
- *
  * ## Identity is bound here, behaviour is per query
  *
  * `baseKey`, `cacheName` and `queryKeyHashFn` all decide WHICH entry a key maps to, so all
@@ -99,7 +96,7 @@ export const defineQueryClient = ({
 }: {
   baseKey?: BaseKey;
   cacheName?: string;
-  /** Escape hatch under `baseKey`. Must return a URL-safe string. */
+  /** Escape hatch under `baseKey`. */
   queryKeyHashFn?: QueryKeyHashFn;
   defaults?: QueryClientDefaults;
 } = {}): QueryClient => {
