@@ -1,3 +1,14 @@
+## 0.12.2 (2026-10-16)
+
+
+### 🩹 Fixes
+
+- **cache-api:** percent-encode the hashed key in its cache URL ([3f10a9a](https://github.com/anymaniax/cf-workers-query/commit/3f10a9a))
+
+### ❤️  Thank You
+
+- Victor Bury
+
 ## 0.12.1 (2026-09-25)
 
 
